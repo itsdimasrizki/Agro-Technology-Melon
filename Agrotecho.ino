@@ -4,10 +4,10 @@
 */
 
 #include <Wire.h>
-#include <I2C_RTC.h>
-#include <Adafruit_SHT31.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+#include <RTClib.h> // RTClib
+#include <Adafruit_SHT31.h> // Adafruit SHT31
+#include <OneWire.h> // OneWire
+#include <DallasTemperature.h> // DallasTemperature
 
 /*
  * PIN CONFIGURATION
@@ -69,7 +69,7 @@ bool RELAY_ACTIVE_LOW = true;
  * GLOBAL OBJECT
  *********************************************************/
 
-static PCF8563 RTC;
+static RTC_PCF8563 rtc;
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
@@ -125,7 +125,12 @@ void relayWrite(uint8_t pin, bool state)
 
 void setupRTCPCF8563()
 {
-  RTC.begin();
+  if (!rtc.begin())
+  {
+    Serial.println("RTC PCF8563 tidak ditemukan");
+    while (1);
+  }
+  // RTC.begin();
 
   /*
   <konfigur disini>
@@ -144,14 +149,16 @@ void setupRTCPCF8563()
 
 void readRTCPCF8563()
 {
+  DateTime now = rtc.now();
+
   Serial.printf(
-    "%02d/%02d/%d %02d:%02d:%02d\n",
-    RTC.getDay(),
-    RTC.getMonth(),
-    RTC.getYear(),
-    RTC.getHours(),
-    RTC.getMinutes(),
-    RTC.getSeconds()
+    "%02d/%02d/%04d %02d:%02d:%02d\n",
+    now.day(),
+    now.month(),
+    now.year(),
+    now.hour(),
+    now.minute(),
+    now.second()
   );
 }
 

@@ -6,7 +6,7 @@
 OneWire oneWire(DS18B20_PIN);
 DallasTemperature sensors(&oneWire);
 
-void initSuhu() {
+void initSuhuAir() {
   Serial.begin(115200);
 
   sensors.begin();
@@ -14,11 +14,11 @@ void initSuhu() {
   if (sensors.getDeviceCount() > 0) {
     Serial.println("DS18B20 Berhasil Terdeteksi");
   } else {
-    Serial.println("Kasih error: DS18B20 Tidak Terdeteksi");
+    Serial.println("Error: DS18B20 Tidak Terdeteksi");
   }
 }
 
-void runSuhu() {
+void runSuhuAir() {
   sensors.requestTemperatures();
 
   float suhu = sensors.getTempCByIndex(0);

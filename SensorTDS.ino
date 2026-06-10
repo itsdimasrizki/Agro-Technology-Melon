@@ -1,12 +1,10 @@
 #define TDS_PIN 2
 
-void initTDS()
-{
+void initTDS() {
     pinMode(TDS_PIN, INPUT);
 }
 
-float readTDS()
-{
+float readTDS() {
     int adcValue = analogRead(TDS_PIN);
 
     float voltage = adcValue * (3.3 / 4095.0);
@@ -19,8 +17,7 @@ float readTDS()
     return tdsValue;
 }
 
-void printTDS()
-{
+void printTDS() {
     int adcValue = analogRead(TDS_PIN);
 
     float voltage = adcValue * (3.3 / 4095.0);

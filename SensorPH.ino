@@ -5,8 +5,7 @@
 
 DFRobot_PH ph;
 
-void initPH()
-{
+void initPH() {
     EEPROM.begin(32);
     ph.begin();
 
@@ -15,8 +14,7 @@ void initPH()
     Serial.println("================================");
 }
 
-void readPH()
-{
+void readPH() {
     int adcValue = analogRead(PH_PIN);
 
     float voltage = adcValue * (3.3f / 4095.0f);

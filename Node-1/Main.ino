@@ -2,6 +2,7 @@
 
 #include "actuators/RelayManager.h"
 #include "sensors/FlowMeter.h"
+#include "sensors/WaterLevel.h"
 
 RelayManager relay;
 
@@ -23,6 +24,11 @@ void IRAM_ATTR flowBISR() {
     flowB.pulseCount++;
 }
 
+WaterLevel waterLevel(
+    ULTRASONIC_TRIG,
+    ULTRASONIC_ECHO
+);
+
 void setup() {
     Serial.begin(115200);
 
@@ -31,6 +37,8 @@ void setup() {
     flowWater.begin(flowWaterISR);
     flowA.begin(flowAISR);
     flowB.begin(flowBISR);
+
+    waterLevel.begin();
 
     Serial.println("System Ready");
 }
@@ -60,5 +68,11 @@ void loop() {
             flowB.getVolumeLiter(),
             3
         );
+
+        Serial.print("Level : ");
+        Serial.print(
+            waterLevel.getLevelPercent()
+        );
+        Serial.println("%");
     }
 }

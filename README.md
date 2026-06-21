@@ -1,7 +1,7 @@
 # Smart Water Monitoring System
 
 ## Struktur Folder
-
+```
 Agro-Technology-Melon
 │
 ├── Node-1                              # Main Controller ESP32-S3
@@ -88,7 +88,7 @@ Agro-Technology-Melon
 │   └── main.ino                        # Entry point Node-2
 │
 └── README.md                           # Dokumentasi proyek
-
+```
 ## Deskripsi
 
 Smart Water Monitoring System adalah sistem monitoring kualitas dan kondisi air berbasis ESP32-S3 yang mampu membaca berbagai parameter penting secara real-time seperti:

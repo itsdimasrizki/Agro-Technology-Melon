@@ -119,7 +119,12 @@ FertigationFSM::getState() const {
     return state;
 }
 
-void FertigationFSM::handleIdle() {}
+void FertigationFSM::handleIdle() {
+    relayManager.allOff();
+    // if(systemEnabled) {
+    //     changeState(FertigationState::WAIT_DAILY_MIX);
+    // }
+}
 
 void FertigationFSM::handleWaitDailyMix() {
     uint8_t hour = rtcManager.getHour();
@@ -292,4 +297,12 @@ void FertigationFSM::handleIrrigation() {
     }
 }
 
-void FertigationFSM::handleError(){}
+void FertigationFSM::handleError() {
+    if(!stateInitialized) {
+        relayManager.allOff();
+
+        Serial.println("[FSM] ERROR STATE");
+
+        stateInitialized = true;
+    }
+}

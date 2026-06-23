@@ -3,8 +3,7 @@
 WaterLevel::WaterLevel(
     uint8_t trigPin,
     uint8_t echoPin
-)
-{
+) {
     _trigPin = trigPin;
     _echoPin = echoPin;
 }
@@ -56,4 +55,13 @@ float WaterLevel::getLevelPercent() {
         );
 
     return level;
+}
+
+float WaterLevel::getVolumeLiter() {
+    float level = getLevelPercent();
+
+    if(level < 0)
+        return -1;
+
+    return (level / 100.0f) * tankCapacityLiter;
 }

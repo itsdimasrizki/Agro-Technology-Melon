@@ -196,7 +196,11 @@ void FertigationFSM::handlePrepareDailyMix() {
     targetPPM = currentRecipe.targetPPM;
     targetMinPH = currentRecipe.targetMinPH;
     targetMaxPH = currentRecipe.targetMaxPH;
-    targetWaterVolume = DAILY_TARGET_VOLUME;
+    targetWaterVolume = DAILY_TARGET_VOLUME - sensor.tankVolume;
+    if(targetWaterVolume < 0) {
+        targetWaterVolume = 0;
+    }
+    
     targetNutrientA = INITIAL_NUTRIENT_A;
     targetNutrientB = INITIAL_NUTRIENT_B;
 

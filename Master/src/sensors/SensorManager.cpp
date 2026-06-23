@@ -38,9 +38,8 @@ void SensorManager::update() {
 
     data.flowB = flowB.getVolumeLiter();
 
-    // data.currentVolume = flowWater.getVolumeLiter();
-    // data.currentVolume = data.flowWater;
-    data.currentVolume = 0.0f;
+    data.tankVolume = levelSensor.getVolumeLiter();
+    // data.tankVolume = 0.0f;
     // data.currentVolume = levelSensor.getVolumeLiter();
 
     if(espNow.hasNewData()) {

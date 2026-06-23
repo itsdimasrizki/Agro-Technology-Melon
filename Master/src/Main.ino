@@ -161,6 +161,9 @@ void loop() {
         Serial.print("Flow B : ");
         Serial.println(data.flowB);
 
+        Serial.print("Tank Volume : ");
+        Serial.println(data.tankVolume);
+
         Serial.println("----------------");
     }
 }

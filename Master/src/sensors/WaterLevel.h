@@ -16,6 +16,8 @@ public:
     float getDistanceCM();
 
     float getLevelPercent();
+    
+    float getVolumeLiter();
 
 private:
 
@@ -23,6 +25,7 @@ private:
     uint8_t _echoPin;
 
     float tankHeightCM = 50.0f;
+    float tankCapacityLiter = 500.0f; 
 };
 
 #endif

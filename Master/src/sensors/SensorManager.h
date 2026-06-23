@@ -13,7 +13,7 @@ struct SensorData {
     float ph;
     float ppm;
 
-    float waterLevel;
+    float tankVolume;
 
     uint16_t soilADC;
 
@@ -21,7 +21,7 @@ struct SensorData {
     float flowA;
     float flowB;
 
-    float currentVolume;
+    float waterLevel;
 };
 
 class SensorManager {

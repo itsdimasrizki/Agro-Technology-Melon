@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dokumentasi teknis sistem Agro-Technology Melon — Master Node. Panduan untuk tim Cloud & MQTT.">
+    <title>Agro-Technology Melon — Dokumentasi Master Node</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        /* ===== RESET & BASE ===== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-deep: #0a0e1a;
+            --bg-surface: #111827;
+            --bg-card: rgba(17, 24, 39, 0.7);
+            --bg-glass: rgba(255,255,255,0.04);
+            --border-glass: rgba(255,255,255,0.08);
+            --accent-green: #34d399;
+            --accent-green-dim: rgba(52,211,153,0.15);
+            --accent-blue: #60a5fa;
+            --accent-blue-dim: rgba(96,165,250,0.12);
+            --accent-amber: #fbbf24;
+            --accent-amber-dim: rgba(251,191,36,0.12);
+            --accent-rose: #fb7185;
+            --accent-rose-dim: rgba(251,113,133,0.12);
+            --accent-purple: #a78bfa;
+            --accent-purple-dim: rgba(167,139,250,0.12);
+            --accent-cyan: #22d3ee;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            line-height: 1.7;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ===== AMBIENT BACKGROUND ===== */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background:
+                radial-gradient(ellipse 600px 600px at 20% 20%, rgba(52,211,153,0.07), transparent),
+                radial-gradient(ellipse 500px 500px at 80% 60%, rgba(96,165,250,0.06), transparent),
+                radial-gradient(ellipse 400px 400px at 50% 90%, rgba(167,139,250,0.05), transparent);
+            z-index: -1;
+            animation: ambientDrift 25s ease-in-out infinite alternate;
+        }
+        @keyframes ambientDrift {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(-30px, -20px) rotate(3deg); }
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+        /* ===== LAYOUT ===== */
+        .page-wrapper { display: flex; min-height: 100vh; }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: 280px;
+            height: 100vh;
+            background: rgba(15,23,42,0.92);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-right: 1px solid var(--border-glass);
+            padding: 28px 20px;
+            overflow-y: auto;
+            z-index: 100;
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .sidebar-brand .icon {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--accent-green), #059669);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 16px rgba(52,211,153,0.25);
+        }
+        .sidebar-brand h1 {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            line-height: 1.2;
+        }
+        .sidebar-brand h1 span {
+            display: block;
+            font-size: 11px;
+            font-weight: 400;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .sidebar-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            margin-bottom: 28px;
+            margin-top: 10px;
+        }
+        .sidebar-badge::before {
+            content: '';
+            width: 6px; height: 6px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.7); }
+        }
+
+        .nav-section {
+            margin-bottom: 24px;
+        }
+        .nav-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            padding: 0 12px;
+            margin-bottom: 8px;
+        }
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13.5px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .nav-link:hover {
+            background: var(--bg-glass);
+            color: var(--text-primary);
+        }
+        .nav-link.active {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+        }
+        .nav-link .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            margin-left: 280px;
+            flex: 1;
+            padding: 40px 48px 80px;
+            max-width: 1100px;
+        }
+
+        /* ===== HERO ===== */
+        .hero {
+            background: linear-gradient(135deg, rgba(52,211,153,0.08), rgba(96,165,250,0.06), rgba(167,139,250,0.05));
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 48px 44px;
+            margin-bottom: 48px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::after {
+            content: '';
+            position: absolute;
+            top: -60%; right: -20%;
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, rgba(52,211,153,0.08), transparent 70%);
+            pointer-events: none;
+        }
+        .hero-eyebrow {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--accent-green);
+            margin-bottom: 12px;
+        }
+        .hero h2 {
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -0.8px;
+            line-height: 1.2;
+            margin-bottom: 14px;
+            background: linear-gradient(135deg, #f1f5f9, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero p {
+            color: var(--text-secondary);
+            font-size: 15px;
+            max-width: 620px;
+            line-height: 1.8;
+        }
+        .hero-meta {
+            display: flex;
+            gap: 24px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+        .hero-meta-item {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .hero-meta-item .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+        }
+
+        /* ===== SECTION ===== */
+        .section {
+            margin-bottom: 56px;
+            scroll-margin-top: 32px;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .section-icon {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.4px;
+        }
+        .section-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.7;
+        }
+
+        /* ===== CARDS ===== */
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius);
+            padding: 28px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            border-color: rgba(255,255,255,0.12);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card-desc {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        /* ===== GRID ===== */
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+        /* ===== STAT CARDS ===== */
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius);
+            padding: 22px 24px;
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.2);
+        }
+        .stat-card .stat-icon { font-size: 28px; margin-bottom: 10px; }
+        .stat-card .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+        .stat-card .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
+
+        /* ===== MERMAID DIAGRAMS ===== */
+        .diagram-container {
+            background: rgba(15,23,42,0.6);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius);
+            padding: 32px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        .diagram-container .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        .diagram-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .diagram-label::before {
+            content: '';
+            width: 3px; height: 14px;
+            background: var(--accent-green);
+            border-radius: 2px;
+        }
+
+        /* ===== CODE BLOCKS ===== */
+        .code-block {
+            background: rgba(10,14,26,0.8);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            padding: 20px 24px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.8;
+            overflow-x: auto;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+        }
+        .code-block .keyword { color: var(--accent-purple); }
+        .code-block .type { color: var(--accent-cyan); }
+        .code-block .string { color: var(--accent-green); }
+        .code-block .comment { color: var(--text-muted); font-style: italic; }
+        .code-block .number { color: var(--accent-amber); }
+        .code-block .function { color: var(--accent-blue); }
+
+        /* ===== TABLE ===== */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-glass);
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13.5px;
+        }
+        thead th {
+            background: rgba(15,23,42,0.8);
+            padding: 14px 18px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-glass);
+        }
+        tbody td {
+            padding: 13px 18px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+        }
+        tbody tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
+        tbody tr:last-child td { border-bottom: none; }
+
+        /* ===== BADGES ===== */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+        .badge-green { background: var(--accent-green-dim); color: var(--accent-green); }
+        .badge-blue { background: var(--accent-blue-dim); color: var(--accent-blue); }
+        .badge-amber { background: var(--accent-amber-dim); color: var(--accent-amber); }
+        .badge-rose { background: var(--accent-rose-dim); color: var(--accent-rose); }
+        .badge-purple { background: var(--accent-purple-dim); color: var(--accent-purple); }
+
+        /* ===== TOPIC LIST ===== */
+        .topic-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 16px 20px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            margin-bottom: 10px;
+            transition: border-color 0.2s;
+        }
+        .topic-item:hover { border-color: rgba(255,255,255,0.12); }
+        .topic-path {
+            font-family: var(--font-mono);
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            white-space: nowrap;
+        }
+        .topic-meta {
+            flex: 1;
+        }
+        .topic-meta .topic-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .topic-direction {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .dir-pub { background: var(--accent-green-dim); color: var(--accent-green); }
+        .dir-sub { background: var(--accent-blue-dim); color: var(--accent-blue); }
+
+        /* ===== FILE TREE ===== */
+        .file-tree {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 2;
+            color: var(--text-secondary);
+            background: rgba(10,14,26,0.6);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            padding: 24px 28px;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .file-tree .folder { color: var(--accent-blue); font-weight: 600; }
+        .file-tree .file { color: var(--text-secondary); }
+        .file-tree .highlight { color: var(--accent-green); font-weight: 600; }
+
+        /* ===== ALERT/NOTE BOXES ===== */
+        .alert {
+            padding: 18px 22px;
+            border-radius: var(--radius-sm);
+            border-left: 3px solid;
+            margin-bottom: 20px;
+            font-size: 13.5px;
+            line-height: 1.7;
+        }
+        .alert-info { background: var(--accent-blue-dim); border-color: var(--accent-blue); color: var(--accent-blue); }
+        .alert-warn { background: var(--accent-amber-dim); border-color: var(--accent-amber); color: var(--accent-amber); }
+        .alert-success { background: var(--accent-green-dim); border-color: var(--accent-green); color: var(--accent-green); }
+        .alert-title { font-weight: 700; margin-bottom: 4px; font-size: 13px; }
+
+        /* ===== DIVIDER ===== */
+        .divider {
+            height: 1px;
+            background: var(--border-glass);
+            margin: 40px 0;
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            margin-top: 64px;
+            padding: 28px 0;
+            border-top: 1px solid var(--border-glass);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* ===== MOBILE HAMBURGER ===== */
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 16px; left: 16px;
+            z-index: 200;
+            width: 44px; height: 44px;
+            background: rgba(15,23,42,0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1024px) {
+            .grid-4 { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .mobile-toggle { display: flex; }
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; padding: 24px 20px 60px; }
+            .hero { padding: 32px 24px; }
+            .hero h2 { font-size: 24px; }
+            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+        }
+
+        /* ===== ANIMATIONS ===== */
+        .fade-in {
+            opacity: 0; transform: translateY(16px);
+            animation: fadeIn 0.6s ease forwards;
+        }
+        @keyframes fadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+
+<!-- Mobile Toggle -->
+<button class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')" aria-label="Toggle navigation">☰</button>
+
+<div class="page-wrapper">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="icon">🍈</div>
+            <h1>Agro-Tech Melon<span>Master Node Docs</span></h1>
+        </div>
+        <div class="sidebar-badge">Cloud & MQTT Team</div>
+
+        <nav>
+            <div class="nav-section">
+                <div class="nav-section-title">Overview</div>
+                <a href="#overview" class="nav-link active"><span class="nav-icon">📋</span> Ringkasan Sistem</a>
+                <a href="#architecture" class="nav-link"><span class="nav-icon">🏗️</span> Arsitektur</a>
+                <a href="#file-structure" class="nav-link"><span class="nav-icon">📁</span> Struktur File</a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Diagram</div>
+                <a href="#flowchart" class="nav-link"><span class="nav-icon">🔄</span> Diagram Alur FSM</a>
+                <a href="#class-diagram" class="nav-link"><span class="nav-icon">🧱</span> Diagram Class</a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Referensi Data</div>
+                <a href="#sensor-data" class="nav-link"><span class="nav-icon">📡</span> Struktur Data Sensor</a>
+                <a href="#fsm-states" class="nav-link"><span class="nav-icon">⚙️</span> Tabel State FSM</a>
+                <a href="#constants" class="nav-link"><span class="nav-icon">🔧</span> Konfigurasi & Konstanta</a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Integrasi</div>
+                <a href="#mqtt-guide" class="nav-link"><span class="nav-icon">☁️</span> Panduan MQTT</a>
+                <a href="#mqtt-topics" class="nav-link"><span class="nav-icon">📨</span> Rekomendasi Topic</a>
+                <a href="#payload" class="nav-link"><span class="nav-icon">📦</span> Format Payload</a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main-content">
+
+        <!-- HERO -->
+        <section class="hero fade-in" id="overview">
+            <div class="hero-eyebrow">Dokumentasi Teknis — Master Node</div>
+            <h2>Agro-Technology Melon<br>Smart Fertigation System</h2>
+            <p>
+                Panduan lengkap arsitektur firmware <strong>Master Node</strong> untuk tim <strong>Cloud & MQTT</strong>. 
+                Dokumen ini mencakup diagram alur FSM, diagram class, struktur data sensor, 
+                dan rekomendasi integrasi MQTT agar data dari ESP32‑S3 dapat diteruskan ke cloud secara efisien.
+            </p>
+            <div class="hero-meta">
+                <div class="hero-meta-item"><span class="dot" style="background:var(--accent-green)"></span> Platform: ESP32-S3</div>
+                <div class="hero-meta-item"><span class="dot" style="background:var(--accent-blue)"></span> Framework: Arduino / PlatformIO</div>
+                <div class="hero-meta-item"><span class="dot" style="background:var(--accent-purple)"></span> Komunikasi: ESP-NOW → MQTT Bridge</div>
+                <div class="hero-meta-item"><span class="dot" style="background:var(--accent-amber)"></span> Bahasa: C++</div>
+            </div>
+        </section>
+
+        <!-- STATS -->
+        <div class="grid-4 fade-in delay-1" style="margin-bottom:48px">
+            <div class="stat-card">
+                <div class="stat-icon">🧪</div>
+                <div class="stat-value" style="color:var(--accent-green)">6</div>
+                <div class="stat-label">Sensor Aktif</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⚙️</div>
+                <div class="stat-value" style="color:var(--accent-blue)">13</div>
+                <div class="stat-label">State FSM</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔌</div>
+                <div class="stat-value" style="color:var(--accent-amber)">8</div>
+                <div class="stat-label">Relay Channel</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📦</div>
+                <div class="stat-value" style="color:var(--accent-purple)">9</div>
+                <div class="stat-label">Class Utama</div>
+            </div>
+        </div>
+
+        <!-- ===== ARCHITECTURE ===== -->
+        <section class="section fade-in delay-2" id="architecture">
+            <div class="section-header">
+                <div class="section-icon" style="background:var(--accent-blue-dim);color:var(--accent-blue)">🏗️</div>
+                <h3 class="section-title">Arsitektur Sistem</h3>
+            </div>
+            <p class="section-subtitle">
+                Master Node berfungsi sebagai pusat kontrol FSM yang membaca sensor kualitas air, 
+                mengelola relay pompa, dan menerima data tanah dari Sleeve Node via ESP-NOW. 
+                Tim Cloud akan menjembatani data ini ke cloud melalui protokol MQTT.
+            </p>
+            <div class="diagram-container">
+                <div class="diagram-label">Arsitektur Komunikasi Keseluruhan</div>
+                <div class="mermaid">
+graph LR
+    subgraph LAHAN["🌱 Lahan / Greenhouse"]
+        SL["Sleeve Node<br/>(ESP32-S3)<br/>Sensor Tanah"]
+    end
+
+    subgraph TANDON["🧪 Tandon / Reservoir"]
+        MS["Master Node<br/>(ESP32-S3)<br/>Kontrol Fertigasi"]
+        SENS["Sensor Air<br/>pH • TDS • Temp<br/>Level • Flow"]
+        ACT["Aktuator<br/>Relay 8-ch<br/>Pompa & Valve"]
+    end
+
+    subgraph CLOUD_LAYER["☁️ Cloud Layer"]
+        BROKER["MQTT Broker"]
+        DASH["Dashboard /<br/>Monitoring"]
+        DB["Database /<br/>Time Series"]
+    end
+
+    SL -- "ESP-NOW<br/>(Wireless P2P)" --> MS
+    SENS --> MS
+    MS --> ACT
+    MS -- "MQTT Publish<br/>(WiFi)" --> BROKER
+    BROKER --> DASH
+    BROKER --> DB
+    BROKER -- "MQTT Subscribe<br/>(Commands)" --> MS
+
+    style SL fill:#065f46,stroke:#34d399,color:#fff
+    style MS fill:#1e3a5f,stroke:#60a5fa,color:#fff
+    style SENS fill:#1e3a5f,stroke:#22d3ee,color:#fff
+    style ACT fill:#1e3a5f,stroke:#fbbf24,color:#fff
+    style BROKER fill:#4c1d95,stroke:#a78bfa,color:#fff
+    style DASH fill:#4c1d95,stroke:#c084fc,color:#fff
+    style DB fill:#4c1d95,stroke:#c084fc,color:#fff
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== FILE STRUCTURE ===== -->
+        <section class="section fade-in" id="file-structure">
+            <div class="section-header">
+                <div class="section-icon" style="background:var(--accent-purple-dim);color:var(--accent-purple)">📁</div>
+                <h3 class="section-title">Struktur Direktori Master</h3>
+            </div>
+            <div class="file-tree">
+<span class="folder">Master/</span>
+├── platformio.ini
+└── <span class="folder">src/</span>
+    ├── <span class="highlight">Main.ino</span>              <span style="color:var(--text-muted)">← Entry point, inisialisasi semua komponen</span>
+    ├── <span class="folder">actuators/</span>
+    │   ├── RelayManager.cpp
+    │   └── RelayManager.h       <span style="color:var(--text-muted)">← Kontrol 8-channel relay</span>
+    ├── <span class="folder">communication/</span>
+    │   ├── ESPNowManager.cpp
+    │   ├── ESPNowManager.h      <span style="color:var(--text-muted)">← Penerima data ESP-NOW dari Sleeve</span>
+    │   └── SoilData.h           <span style="color:var(--text-muted)">← Struct data tanah</span>
+    ├── <span class="folder">config/</span>
+    │   ├── Constants.h          <span style="color:var(--text-muted)">← Konstanta sistem (volume, waktu, threshold)</span>
+    │   ├── PinConfig.h          <span style="color:var(--text-muted)">← Mapping pin GPIO ESP32-S3</span>
+    │   └── SystemConfig.h
+    ├── <span class="folder">fsm/</span>
+    │   ├── FertigationFSM.cpp
+    │   ├── FertigationFSM.h     <span style="color:var(--text-muted)">← Finite State Machine utama</span>
+    │   └── FertigationState.h   <span style="color:var(--text-muted)">← Enum 13 state</span>
+    ├── <span class="folder">recipe/</span>
+    │   ├── RecipeManager.h      <span style="color:var(--text-muted)">← Resep nutrisi berdasarkan usia tanaman</span>
+    │   ├── IrrigationRecipe.h   <span style="color:var(--text-muted)">← Konfigurasi threshold irigasi</span>
+    │   └── Secret*.h            <span style="color:var(--text-muted)">← Nilai resep (rahasia, .gitignore)</span>
+    ├── <span class="folder">rtc/</span>
+    │   ├── RTCManager.cpp
+    │   └── RTCManager.h         <span style="color:var(--text-muted)">← RTC PCF8563, usia tanaman, penjadwalan</span>
+    ├── <span class="folder">sensors/</span>
+    │   ├── SensorManager.h      <span style="color:var(--text-muted)">← Aggregator seluruh sensor</span>
+    │   ├── PHSensor.h
+    │   ├── TDSSensor.h
+    │   ├── WaterTempSensor.h
+    │   ├── WaterLevel.h
+    │   ├── FlowMeter.h          <span style="color:var(--text-muted)">← 3x flow meter (water, A, B)</span>
+    │   └── MedianFilter.h
+    └── <span class="folder">utils/</span>
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+        <!-- ===== FSM FLOWCHART ===== -->
+        <section class="section fade-in" id="flowchart">
+            <div class="section-header">
+                <div class="section-icon" style="background:var(--accent-green-dim);color:var(--accent-green)">🔄</div>
+                <h3 class="section-title">Diagram Alur — Finite State Machine</h3>
+            </div>
+            <p class="section-subtitle">
+                FSM mengendalikan seluruh siklus fertigasi: dari pengisian air, pencampuran nutrisi A/B, validasi PPM, 
+                hingga irigasi otomatis berdasarkan kelembapan tanah. Setiap transisi state harus dipublikasikan ke MQTT 
+                agar cloud dashboard dapat memonitor progres secara real‑time.
+            </p>
+
+            <div class="diagram-container">
+                <div class="diagram-label">Flowchart FSM Fertigasi</div>
+                <div class="mermaid">
+flowchart TD
+    IDLE["🔴 IDLE<br/>Sistem Nonaktif"]
+    WAIT["⏳ WAIT_DAILY_MIX<br/>Menunggu Jadwal Harian<br/>(05:00 WIB)"]
+    PREPARE["📋 PREPARE_DAILY_MIX<br/>Ambil Resep Nutrisi<br/>Berdasarkan Usia Tanaman"]
+    FILL["💧 FILL_WATER<br/>Isi Air ke Tandon<br/>Target: 160 Liter"]
+    ADD_A["🧪 ADD_NUTRIENT_A<br/>Pompa Nutrisi A<br/>Target: 0.8 Liter"]
+    MIX_A["🔄 MIX_A<br/>Aduk 5 Menit"]
+    ADD_B["🧬 ADD_NUTRIENT_B<br/>Pompa Nutrisi B<br/>Target: 0.8 Liter"]
+    MIX_B["🔄 MIX_B<br/>Aduk 5 Menit"]
+    VALIDATE["✅ VALIDATE<br/>Cek PPM & pH<br/>Sesuai Resep?"]
+    CORRECT["⚗️ CORRECT_PPM<br/>Tambah Koreksi A+B<br/>Dosis: 50mL"]
+    CORR_MIX["🔄 CORRECTION_MIX<br/>Aduk Koreksi<br/>1 Menit"]
+    READY["🟢 READY<br/>Larutan Siap<br/>Monitoring Tanah"]
+    IRRIGATE["🌱 IRRIGATION<br/>Pompa Irigasi Aktif<br/>Sampai Tanah Basah"]
+    ERR["🚨 ERROR<br/>All Relay OFF<br/>Manual Reset Needed"]
+
+    IDLE -->|"systemEnabled"| WAIT
+    WAIT -->|"Jam 05:00 & belum mix"| PREPARE
+    PREPARE -->|"Resep dimuat"| FILL
+    FILL -->|"flowWater >= 160L"| ADD_A
+    FILL -->|"Timeout 30 menit"| ERR
+    ADD_A -->|"flowA >= target"| MIX_A
+    ADD_A -->|"Timeout 5 menit"| ERR
+    MIX_A -->|"5 menit selesai"| ADD_B
+    ADD_B -->|"flowB >= target"| MIX_B
+    ADD_B -->|"Timeout 5 menit"| ERR
+    MIX_B -->|"5 menit selesai"| VALIDATE
+    VALIDATE -->|"PPM OK"| READY
+    VALIDATE -->|"PPM kurang"| CORRECT
+    CORRECT -->|"PPM tercapai"| READY
+    CORRECT -->|"Koreksi 50mL selesai"| CORR_MIX
+    CORR_MIX -->|"1 menit selesai"| VALIDATE
+    READY -->|"soilADC >= dryThreshold"| IRRIGATE
+    IRRIGATE -->|"soilADC <= wetThreshold"| READY
+
+    style IDLE fill:#991b1b,stroke:#f87171,color:#fff
+    style WAIT fill:#92400e,stroke:#fbbf24,color:#fff
+    style PREPARE fill:#1e3a5f,stroke:#60a5fa,color:#fff
+    style FILL fill:#164e63,stroke:#22d3ee,color:#fff
+    style ADD_A fill:#065f46,stroke:#34d399,color:#fff
+    style MIX_A fill:#3f6212,stroke:#84cc16,color:#fff
+    style ADD_B fill:#065f46,stroke:#34d399,color:#fff
+    style MIX_B fill:#3f6212,stroke:#84cc16,color:#fff
+    style VALIDATE fill:#4c1d95,stroke:#a78bfa,color:#fff
+    style CORRECT fill:#9a3412,stroke:#fb923c,color:#fff
+    style CORR_MIX fill:#9a3412,stroke:#fb923c,color:#fff
+    style READY fill:#14532d,stroke:#22c55e,color:#fff
+    style IRRIGATE fill:#0e7490,stroke:#06b6d4,color:#fff
+    style ERR fill:#7f1d1d,stroke:#ef4444,color:#fff
+                </div>
+            </div>
+
+            <div class="alert alert-info">
+                <div class="alert-title">💡 Catatan untuk Tim Cloud</div>
+                Setiap kali <code>changeState()</code> dipanggil, state baru harus di-publish ke MQTT topic 
+                <code>agro/master/fsm/state</code>. Ini memungkinkan dashboard menampilkan progres fertigasi secara visual.
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+        <!-- ===== CLASS DIAGRAM ===== -->
+        <section class="section fade-in" id="class-diagram">
+            <div class="section-header">
+                <div class="section-icon" style="background:var(--accent-cyan) ;background:rgba(34,211,238,0.12);color:var(--accent-cyan)">🧱</div>
+                <h3 class="section-title">Diagram Class</h3>
+            </div>
+            <p class="section-subtitle">
+                Diagram berikut menunjukkan relasi antar class di firmware Master. 
+                <strong>FertigationFSM</strong> adalah class sentral yang menggunakan seluruh modul sensor, aktuator, dan resep.
+                Pahami dependensi ini agar integrasi MQTT tidak merusak arsitektur existing.
+            </p>
+
+            <div class="diagram-container">
+                <div class="diagram-label">Class Diagram — Master Node</div>
+                <div class="mermaid">
+classDiagram
+    direction TB
+
+    class FertigationFSM {
+        -FertigationState state
+        -unsigned long stateStartTime
+        -bool stateInitialized
+        -float targetWaterVolume
+        -float targetNutrientA
+        -float targetNutrientB
+        -uint16_t targetPPM
+        -float targetMinPH
+        -float targetMaxPH
+        -NutrientRecipe currentRecipe
+        -IrrigationConfig currentIrrigation
+        -SensorData sensor
+        +begin() void
+        +update() void
+        +getState() FertigationState
+        -changeState(newState) void
+        -handleIdle() void
+        -handleWaitDailyMix() void
+        -handlePrepareDailyMix() void
+        -handleFillWater() void
+        -handleAddNutrientA() void
+        -handleMixA() void
+        -handleAddNutrientB() void
+        -handleMixB() void
+        -handleValidate() void
+        -handleCorrectPPM() void
+        -handleCorrectionMix() void
+        -handleReady() void
+        -handleIrrigation() void
+        -handleError() void
+    }
+
+    class SensorManager {
+        -SensorData data
+        +update() void
+        +getData() SensorData
+    }
+
+    class SensorData {
+        &lt;&lt;struct&gt;&gt;
+        +float temperature
+        +float ph
+        +float ppm
+        +float waterLevel
+        +uint16_t soilADC
+        +float flowWater
+        +float flowA
+        +float flowB
+        +float currentVolume
+    }
+
+    class RelayManager {
+        +begin() void
+        +on(relay) void
+        +off(relay) void
+        +allOff() void
+        -getPin(relay) uint8_t
+    }
+
+    class RTCManager {
+        -RTC_PCF8563 rtc
+        -DateTime plantingDate
+        +begin() void
+        +now() DateTime
+        +getPlantAgeDays() uint16_t
+        +getHour() uint8_t
+        +getMinute() uint8_t
+        +getDay() uint8_t
+        +getMonth() uint8_t
+        +getYear() uint16_t
+    }
+
+    class ESPNowManager {
+        -SoilData receivedData$
+        -bool newData$
+        +begin() bool
+        +hasNewData() bool
+        +getData() SoilData
+        +clearFlag() void
+        -onDataRecv(mac, data, len)$ void
+    }
+
+    class RecipeManager {
+        +getRecipe(ageDays) NutrientRecipe
+    }
+
+    class IrrigationRecipe {
+        +getRecipe(ageDays) IrrigationConfig
+    }
+
+    class FlowMeter {
+        -uint8_t pin
+        -unsigned long lastCalcTime
+        -uint32_t lastPulseCount
+        -float PULSES_PER_LITER$
+        +volatile uint32_t pulseCount
+        +begin(isr) void
+        +getVolumeLiter() float
+        +getFlowRate() float
+        +reset() void
+    }
+
+    class PHSensor {
+        +begin() void
+        +readPH() float
+    }
+
+    class TDSSensor {
+        +begin() void
+        +readPPM() float
+    }
+
+    class WaterLevel {
+        +begin() void
+        +readLevel() float
+    }
+
+    class WaterTempSensor {
+        +begin() void
+        +readTemp() float
+    }
+
+    class NutrientRecipe {
+        &lt;&lt;struct&gt;&gt;
+        +float targetPPM
+        +float targetMinPH
+        +float targetMaxPH
+    }
+
+    class IrrigationConfig {
+        &lt;&lt;struct&gt;&gt;
+        +uint16_t dryThreshold
+        +uint16_t wetThreshold
+    }
+
+    class SoilData {
+        &lt;&lt;struct&gt;&gt;
+        +uint16_t averageRawADC
+    }
+
+    class FertigationState {
+        &lt;&lt;enum&gt;&gt;
+        IDLE
+        WAIT_DAILY_MIX
+        PREPARE_DAILY_MIX
+        FILL_WATER
+        ADD_NUTRIENT_A
+        MIX_A
+        ADD_NUTRIENT_B
+        MIX_B
+        VALIDATE
+        CORRECT_PPM
+        CORRECTION_MIX
+        READY
+        IRRIGATION
+        ERROR
+    }
+
+    class RelayChannel {
+        &lt;&lt;enum&gt;&gt;
+        RELAY_WATER
+        RELAY_NUTRIENT_A
+        RELAY_NUTRIENT_B
+        RELAY_IRRIGATION
+        RELAY_5 ~ RELAY_8
+    }
+
+    FertigationFSM --> SensorManager : reads sensor data
+    FertigationFSM --> RelayManager : controls actuators
+    FertigationFSM --> RTCManager : reads time & schedule
+    FertigationFSM --> RecipeManager : gets nutrient recipe
+    FertigationFSM --> IrrigationRecipe : gets irrigation config
+    FertigationFSM --> FlowMeter : monitors 3x flow
+    FertigationFSM --> FertigationState : current state
+
+    SensorManager --> PHSensor
+    SensorManager --> TDSSensor
+    SensorManager --> WaterTempSensor
+    SensorManager --> WaterLevel
+    SensorManager --> ESPNowManager : soil data from Sleeve
+    SensorManager --> FlowMeter
+
+    SensorManager --> SensorData : produces
+    RecipeManager --> NutrientRecipe : produces
+    IrrigationRecipe --> IrrigationConfig : produces
+    ESPNowManager --> SoilData : receives
+    RelayManager --> RelayChannel : uses
+                </div>
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+        <!-- ===== SENSOR DATA ===== -->
+        <section class="section fade-in" id="sensor-data">
+            <div class="section-header">
+                <div class="section-icon" style="background:rgba(34,211,238,0.12);color:var(--accent-cyan)">📡</div>
+                <h3 class="section-title">Struktur Data Sensor</h3>
+            </div>
+            <p class="section-subtitle">
+                Struct <code>SensorData</code> adalah data utama yang harus dipublikasikan ke MQTT setiap interval. 
+                Ini berisi seluruh pembacaan sensor dari Master Node ditambah data tanah dari Sleeve.
+            </p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th>Tipe</th>
+                            <th>Unit</th>
+                            <th>Sumber</th>
+                            <th>Deskripsi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code style="color:var(--accent-cyan)">temperature</code></td>
+                            <td><span class="badge badge-blue">float</span></td>
+                            <td>°C</td>
+                            <td>DS18B20</td>
+                            <td>Suhu air di tandon nutrisi</td>
+                        </tr>
+                        <tr>
+                            <td><code style="color:var(--accent-cyan)">ph</code></td>
+                            <td><span class="badge badge-blue">float</span></td>
+                            <td>pH</td>
+                            <td>DFRobot pH</td>
+                            <td>Tingkat keasaman larutan (0–14)</td>
+                        </tr>
+                        <tr>
+                            <td><code style="color:var(--accent-cyan)">ppm</code></td>
+                            <td><span class="badge badge-blue">float</span></td>
+                            <td>ppm</td>
+                            <td>TDS Sensor</td>
+                            <td>Konsentrasi nutrisi (parts per million)</td>
+                        </tr>
+                        <tr>
+                            <td><code style="color:var(--accent-cyan)">waterLevel</code></td>
+                            <td><span class="badge badge-blue">float</span></td>
+                            <td>cm</td>
+                            <td>AJSR04M</td>
+                            <td>Ketinggian air dalam tandon</td>
+                        </tr>
+                        <tr>
+                            <td><code style="color:var(--accent-cyan)">soilADC</code></td>
+                            <td><span class="badge badge-amber">uint16_t</span></td>
+                            <td>ADC raw</td>
+                            <td>Sleeve (ESP-NOW)</td>
+                            <td>Kelembapan tanah mentah dari lahan</td>
+                        </tr>
+                        <tr>
+                            <td><code style="color:var(--accent-cyan)">flowWater</code></td>
+                            <td><span class="badge badge-blue">float</span></td>
+                            <td>Liter</td>
+                            <td>Flow Meter #1</td>
+                            <td>Volume air baku yang terisi</td>
+                        </tr>
+                        <tr>
+                            <td><code style="color:var(--accent-cyan)">flowA</code></td>
+                            <td><span class="badge badge-blue">float</span></td>
+                            <td>Liter</td>
+                            <td>Flow Meter #2</td>
+                            <td>Volume nutrisi A yang dipompa</td>
+                        </tr>
+                        <tr>
+                            <td><code style="color:var(--accent-cyan)">flowB</code></td>
+                            <td><span class="badge badge-blue">float</span></td>
+                            <td>Liter</td>
+                            <td>Flow Meter #3</td>
+                            <td>Volume nutrisi B yang dipompa</td>
+                        </tr>
+                        <tr>
+                            <td><code style="color:var(--accent-cyan)">currentVolume</code></td>
+                            <td><span class="badge badge-blue">float</span></td>
+                            <td>Liter</td>
+                            <td>Kalkulasi</td>
+                            <td>Estimasi volume total larutan saat ini</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid-2" style="margin-top:20px">
+                <div class="card">
+                    <div class="card-title">📥 <code style="color:var(--accent-green)">SoilData</code> <span class="badge badge-green">from Sleeve</span></div>
+                    <div class="card-desc">
+                        Data yang diterima dari Sleeve Node via ESP-NOW. Saat ini hanya berisi satu field:
+                    </div>
+                    <div class="code-block" style="margin-top:12px">
+<span class="keyword">struct</span> <span class="type">SoilData</span> {
+    <span class="type">uint16_t</span> <span class="function">averageRawADC</span>;  <span class="comment">// ADC kelembapan tanah (filtered)</span>
+};
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🧪 <code style="color:var(--accent-purple)">NutrientRecipe</code> <span class="badge badge-purple">per Fase</span></div>
+                    <div class="card-desc">
+                        Resep nutrisi yang berubah sesuai usia tanaman (HST). Digunakan FSM untuk menentukan target pencampuran.
+                    </div>
+                    <div class="code-block" style="margin-top:12px">
+<span class="keyword">struct</span> <span class="type">NutrientRecipe</span> {
+    <span class="type">float</span> <span class="function">targetPPM</span>;    <span class="comment">// Target konsentrasi nutrisi</span>
+    <span class="type">float</span> <span class="function">targetMinPH</span>;  <span class="comment">// Batas bawah pH</span>
+    <span class="type">float</span> <span class="function">targetMaxPH</span>;  <span class="comment">// Batas atas pH</span>
+};
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+        <!-- ===== FSM STATES TABLE ===== -->
+        <section class="section fade-in" id="fsm-states">
+            <div class="section-header">
+                <div class="section-icon" style="background:var(--accent-amber-dim);color:var(--accent-amber)">⚙️</div>
+                <h3 class="section-title">Tabel State FSM</h3>
+            </div>
+            <p class="section-subtitle">
+                Detail setiap state dalam enum <code>FertigationState</code>. 
+                Kolom <strong>Aksi Relay</strong> menunjukkan relay mana yang aktif, penting untuk logging di cloud.
+            </p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>State</th>
+                            <th>Deskripsi</th>
+                            <th>Relay Aktif</th>
+                            <th>Timeout</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-rose">0</span></td>
+                            <td><code>IDLE</code></td>
+                            <td>Sistem nonaktif, semua relay OFF</td>
+                            <td>—</td>
+                            <td>—</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-amber">1</span></td>
+                            <td><code>WAIT_DAILY_MIX</code></td>
+                            <td>Menunggu jadwal harian (05:00)</td>
+                            <td>—</td>
+                            <td>—</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-blue">2</span></td>
+                            <td><code>PREPARE_DAILY_MIX</code></td>
+                            <td>Memuat resep nutrisi berdasarkan usia tanaman</td>
+                            <td>—</td>
+                            <td>—</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-blue">3</span></td>
+                            <td><code>FILL_WATER</code></td>
+                            <td>Mengisi air baku ke tandon (160L)</td>
+                            <td><code>RELAY_WATER</code></td>
+                            <td>30 menit</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-green">4</span></td>
+                            <td><code>ADD_NUTRIENT_A</code></td>
+                            <td>Memompa nutrisi A (0.8L)</td>
+                            <td><code>RELAY_NUTRIENT_A</code></td>
+                            <td>5 menit</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-green">5</span></td>
+                            <td><code>MIX_A</code></td>
+                            <td>Pengadukan setelah nutrisi A</td>
+                            <td>—</td>
+                            <td>5 menit (fixed)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-green">6</span></td>
+                            <td><code>ADD_NUTRIENT_B</code></td>
+                            <td>Memompa nutrisi B (0.8L)</td>
+                            <td><code>RELAY_NUTRIENT_B</code></td>
+                            <td>5 menit</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-green">7</span></td>
+                            <td><code>MIX_B</code></td>
+                            <td>Pengadukan setelah nutrisi B</td>
+                            <td>—</td>
+                            <td>5 menit (fixed)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-purple">8</span></td>
+                            <td><code>VALIDATE</code></td>
+                            <td>Cek PPM apakah sudah sesuai target resep</td>
+                            <td>—</td>
+                            <td>—</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-amber">9</span></td>
+                            <td><code>CORRECT_PPM</code></td>
+                            <td>Koreksi PPM: tambah A+B masing-masing 50mL</td>
+                            <td><code>RELAY_A + RELAY_B</code></td>
+                            <td>—</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-amber">10</span></td>
+                            <td><code>CORRECTION_MIX</code></td>
+                            <td>Pengadukan koreksi sebelum re-validasi</td>
+                            <td>—</td>
+                            <td>1 menit (fixed)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-green">11</span></td>
+                            <td><code>READY</code></td>
+                            <td>Larutan siap, menunggu tanah kering</td>
+                            <td>—</td>
+                            <td>—</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-blue">12</span></td>
+                            <td><code>IRRIGATION</code></td>
+                            <td>Irigasi aktif sampai tanah cukup basah</td>
+                            <td><code>RELAY_IRRIGATION</code></td>
+                            <td>—</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-rose">13</span></td>
+                            <td><code>ERROR</code></td>
+                            <td>Error: semua relay OFF, butuh reset manual</td>
+                            <td>— (all OFF)</td>
+                            <td>—</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+        <!-- ===== CONSTANTS ===== -->
+        <section class="section fade-in" id="constants">
+            <div class="section-header">
+                <div class="section-icon" style="background:var(--accent-rose-dim);color:var(--accent-rose)">🔧</div>
+                <h3 class="section-title">Konfigurasi & Konstanta Sistem</h3>
+            </div>
+            <p class="section-subtitle">
+                Nilai-nilai berikut dari <code>Constants.h</code> akan mempengaruhi perilaku sistem. 
+                Tim cloud perlu memahami ini untuk threshold alerting di dashboard.
+            </p>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">🌿 Greenhouse</div>
+                    <div class="code-block" style="margin-top:10px">
+<span class="keyword">constexpr</span> <span class="type">uint16_t</span> TOTAL_PLANTS     = <span class="number">80</span>;
+<span class="keyword">constexpr</span> <span class="type">float</span>    MAX_CONSUMPTION  = <span class="number">2.0</span>;   <span class="comment">// L/hari/tanaman</span>
+<span class="keyword">constexpr</span> <span class="type">float</span>    DAILY_VOLUME     = <span class="number">160.0</span>; <span class="comment">// 80 × 2.0L</span>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🧪 Nutrisi Awal</div>
+                    <div class="code-block" style="margin-top:10px">
+<span class="keyword">constexpr</span> <span class="type">float</span> BASE_TARGET_PPM  = <span class="number">850.0</span>;
+<span class="keyword">constexpr</span> <span class="type">float</span> INITIAL_A        = <span class="number">0.8</span>;    <span class="comment">// Liter</span>
+<span class="keyword">constexpr</span> <span class="type">float</span> INITIAL_B        = <span class="number">0.8</span>;    <span class="comment">// Liter</span>
+<span class="keyword">constexpr</span> <span class="type">float</span> CORRECTION_DOSE  = <span class="number">0.05</span>;   <span class="comment">// 50mL per koreksi</span>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">⏱️ Timeout & Timer</div>
+                    <div class="code-block" style="margin-top:10px">
+WATER_FILL_TIMEOUT  = <span class="number">1.800.000</span> ms  <span class="comment">// 30 menit</span>
+NUTRIENT_TIMEOUT    = <span class="number">300.000</span> ms    <span class="comment">// 5 menit</span>
+MIX_A_TIME          = <span class="number">300.000</span> ms    <span class="comment">// 5 menit</span>
+MIX_B_TIME          = <span class="number">300.000</span> ms    <span class="comment">// 5 menit</span>
+CORRECTION_MIX_TIME = <span class="number">60.000</span> ms     <span class="comment">// 1 menit</span>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🕐 Jadwal & Batas</div>
+                    <div class="code-block" style="margin-top:10px">
+DAILY_MIX_HOUR      = <span class="number">5</span>            <span class="comment">// Jam 05:00</span>
+DAILY_MIX_MINUTE    = <span class="number">0</span>
+MIN_REMAINING_VOL   = <span class="number">5.0</span>          <span class="comment">// Liter minimum</span>
+PULSES_PER_LITER    = <span class="number">450.0</span>        <span class="comment">// Kalibrasi flow meter</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+        <!-- ===== MQTT INTEGRATION GUIDE ===== -->
+        <section class="section fade-in" id="mqtt-guide">
+            <div class="section-header">
+                <div class="section-icon" style="background:var(--accent-green-dim);color:var(--accent-green)">☁️</div>
+                <h3 class="section-title">Panduan Integrasi MQTT</h3>
+            </div>
+            <p class="section-subtitle">
+                Berikut adalah panduan untuk tim Cloud & MQTT dalam mengintegrasikan firmware Master Node 
+                ke infrastruktur cloud. Sistem saat ini menggunakan <strong>ESP-NOW</strong> untuk komunikasi 
+                lokal, dan akan ditambahkan lapisan MQTT untuk mengirim data ke broker.
+            </p>
+
+            <div class="alert alert-warn">
+                <div class="alert-title">⚠️ Penting: Wi-Fi vs ESP-NOW</div>
+                ESP-NOW dan Wi-Fi bisa berjalan bersamaan pada ESP32-S3, 
+                namun <strong>harus di channel yang sama</strong>. Pastikan Wi-Fi station mode terhubung terlebih dahulu, 
+                lalu ESP-NOW mengikuti channel Wi-Fi. Urutan inisialisasi sangat krusial!
+            </div>
+
+            <div class="diagram-container">
+                <div class="diagram-label">Alur Data: Sensor → MQTT → Cloud</div>
+                <div class="mermaid">
+sequenceDiagram
+    participant SN as 🌱 Sleeve Node
+    participant MN as 🧠 Master Node
+    participant BRK as 📡 MQTT Broker
+    participant DB as 🗄️ Cloud DB
+    participant UI as 📊 Dashboard
+
+    Note over SN,MN: ESP-NOW (Low Latency, P2P)
+
+    SN->>MN: SoilData { averageRawADC }
+    
+    Note over MN: SensorManager.update()
+    Note over MN: FertigationFSM.update()
+
+    loop Setiap 1 detik
+        MN->>BRK: PUBLISH agro/master/sensors (JSON)
+    end
+
+    MN->>BRK: PUBLISH agro/master/fsm/state (on change)
+    MN->>BRK: PUBLISH agro/master/fsm/error (on error)
+    
+    BRK->>DB: Store time-series data
+    BRK->>UI: Real-time updates
+    
+    UI->>BRK: PUBLISH agro/master/cmd/reset
+    BRK->>MN: SUBSCRIBE → handle command
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top:20px">
+                <div class="card">
+                    <div class="card-title">📤 Titik Integrasi Publish</div>
+                    <div class="card-desc" style="margin-bottom:12px">
+                        Tempat di kode firmware dimana MQTT publish harus disisipkan:
+                    </div>
+                    <div class="code-block">
+<span class="comment">// 1. Di loop() — Main.ino (setiap 1 detik)</span>
+<span class="keyword">if</span>(millis() - lastPrint >= <span class="number">1000</span>) {
+    SensorData data = sensorManager.<span class="function">getData</span>();
+    <span class="function">mqttPublishSensors</span>(data);  <span class="comment">// ← tambahkan</span>
+}
+
+<span class="comment">// 2. Di changeState() — FertigationFSM.cpp</span>
+<span class="keyword">void</span> FertigationFSM::<span class="function">changeState</span>(...) {
+    state = newState;
+    <span class="function">mqttPublishState</span>(newState); <span class="comment">// ← tambahkan</span>
+}
+
+<span class="comment">// 3. Di handleError() — FertigationFSM.cpp</span>
+<span class="keyword">void</span> FertigationFSM::<span class="function">handleError</span>() {
+    <span class="function">mqttPublishAlert</span>(<span class="string">"FSM_ERROR"</span>); <span class="comment">// ← tambahkan</span>
+}
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">📥 Titik Integrasi Subscribe</div>
+                    <div class="card-desc" style="margin-bottom:12px">
+                        Command dari cloud yang perlu didengarkan oleh Master:
+                    </div>
+                    <div class="code-block">
+<span class="comment">// Callback MQTT yang perlu dibuat:</span>
+
+<span class="keyword">void</span> <span class="function">onMqttMessage</span>(topic, payload) {
+    <span class="keyword">if</span>(topic == <span class="string">"agro/master/cmd/reset"</span>) {
+        fsm.<span class="function">begin</span>();  <span class="comment">// Reset FSM ke awal</span>
+    }
+    <span class="keyword">if</span>(topic == <span class="string">"agro/master/cmd/irrigate"</span>) {
+        <span class="comment">// Manual override irigasi</span>
+    }
+    <span class="keyword">if</span>(topic == <span class="string">"agro/master/cmd/stop"</span>) {
+        relay.<span class="function">allOff</span>();
+        <span class="comment">// Force ke IDLE</span>
+    }
+}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+        <!-- ===== MQTT TOPICS ===== -->
+        <section class="section fade-in" id="mqtt-topics">
+            <div class="section-header">
+                <div class="section-icon" style="background:var(--accent-purple-dim);color:var(--accent-purple)">📨</div>
+                <h3 class="section-title">Rekomendasi MQTT Topic</h3>
+            </div>
+            <p class="section-subtitle">
+                Struktur topic MQTT yang direkomendasikan mengikuti pola hierarki: 
+                <code style="color:var(--accent-cyan)">agro/{node}/{category}/{subcategory}</code>
+            </p>
+
+            <div class="topic-item">
+                <div class="topic-meta">
+                    <div class="topic-path">agro/master/sensors</div>
+                    <div class="topic-desc">Data semua sensor dalam format JSON, dikirim setiap 1 detik</div>
+                </div>
+                <span class="topic-direction dir-pub">Publish</span>
+            </div>
+            <div class="topic-item">
+                <div class="topic-meta">
+                    <div class="topic-path">agro/master/fsm/state</div>
+                    <div class="topic-desc">State FSM saat ini (integer 0-13), dikirim saat terjadi transisi</div>
+                </div>
+                <span class="topic-direction dir-pub">Publish</span>
+            </div>
+            <div class="topic-item">
+                <div class="topic-meta">
+                    <div class="topic-path">agro/master/fsm/error</div>
+                    <div class="topic-desc">Alert error dengan detail kode dan timestamp, retain = true</div>
+                </div>
+                <span class="topic-direction dir-pub">Publish</span>
+            </div>
+            <div class="topic-item">
+                <div class="topic-meta">
+                    <div class="topic-path">agro/master/recipe/current</div>
+                    <div class="topic-desc">Resep nutrisi yang sedang aktif (PPM target, pH range), dikirim saat PREPARE_DAILY_MIX</div>
+                </div>
+                <span class="topic-direction dir-pub">Publish</span>
+            </div>
+            <div class="topic-item">
+                <div class="topic-meta">
+                    <div class="topic-path">agro/master/relay/status</div>
+                    <div class="topic-desc">Status relay (bitmask 8-bit), dikirim saat on/off relay</div>
+                </div>
+                <span class="topic-direction dir-pub">Publish</span>
+            </div>
+            <div class="topic-item">
+                <div class="topic-meta">
+                    <div class="topic-path">agro/master/cmd/reset</div>
+                    <div class="topic-desc">Perintah reset FSM dari dashboard cloud</div>
+                </div>
+                <span class="topic-direction dir-sub">Subscribe</span>
+            </div>
+            <div class="topic-item">
+                <div class="topic-meta">
+                    <div class="topic-path">agro/master/cmd/irrigate</div>
+                    <div class="topic-desc">Manual override: paksa mulai irigasi dari dashboard</div>
+                </div>
+                <span class="topic-direction dir-sub">Subscribe</span>
+            </div>
+            <div class="topic-item">
+                <div class="topic-meta">
+                    <div class="topic-path">agro/master/cmd/stop</div>
+                    <div class="topic-desc">Emergency stop: matikan semua relay dan pindah ke IDLE</div>
+                </div>
+                <span class="topic-direction dir-sub">Subscribe</span>
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+        <!-- ===== JSON PAYLOAD ===== -->
+        <section class="section fade-in" id="payload">
+            <div class="section-header">
+                <div class="section-icon" style="background:var(--accent-amber-dim);color:var(--accent-amber)">📦</div>
+                <h3 class="section-title">Format JSON Payload</h3>
+            </div>
+            <p class="section-subtitle">
+                Contoh payload JSON yang direkomendasikan untuk setiap topic. Gunakan format ini sebagai 
+                kontrak antara firmware dan backend cloud.
+            </p>
+
+            <div class="card">
+                <div class="card-title">📤 <code style="color:var(--accent-cyan)">agro/master/sensors</code> <span class="badge badge-green">QoS 0</span></div>
+                <div class="code-block" style="margin-top:12px">
+{
+    <span class="string">"timestamp"</span>    : <span class="number">1719100800</span>,
+    <span class="string">"temperature"</span>  : <span class="number">27.5</span>,
+    <span class="string">"ph"</span>           : <span class="number">6.2</span>,
+    <span class="string">"ppm"</span>          : <span class="number">850</span>,
+    <span class="string">"waterLevel"</span>   : <span class="number">45.3</span>,
+    <span class="string">"soilADC"</span>      : <span class="number">2847</span>,
+    <span class="string">"flow"</span>         : {
+        <span class="string">"water"</span>    : <span class="number">155.2</span>,
+        <span class="string">"nutrientA"</span>: <span class="number">0.78</span>,
+        <span class="string">"nutrientB"</span>: <span class="number">0.80</span>
+    },
+    <span class="string">"volume"</span>       : <span class="number">156.78</span>
+}
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top:16px">
+                <div class="card">
+                    <div class="card-title">⚙️ <code style="color:var(--accent-cyan)">agro/master/fsm/state</code> <span class="badge badge-amber">QoS 1 Retain</span></div>
+                    <div class="code-block" style="margin-top:12px">
+{
+    <span class="string">"state"</span>     : <span class="number">3</span>,
+    <span class="string">"name"</span>      : <span class="string">"FILL_WATER"</span>,
+    <span class="string">"since"</span>     : <span class="number">1719100800</span>,
+    <span class="string">"plantAge"</span>  : <span class="number">22</span>
+}
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🚨 <code style="color:var(--accent-cyan)">agro/master/fsm/error</code> <span class="badge badge-rose">QoS 2 Retain</span></div>
+                    <div class="code-block" style="margin-top:12px">
+{
+    <span class="string">"error"</span>     : <span class="string">"WATER_FILL_TIMEOUT"</span>,
+    <span class="string">"fromState"</span> : <span class="string">"FILL_WATER"</span>,
+    <span class="string">"timestamp"</span> : <span class="number">1719100800</span>,
+    <span class="string">"sensors"</span>   : { <span class="comment">/* snapshot */</span> }
+}
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-success" style="margin-top:20px">
+                <div class="alert-title">✅ Tips Payload</div>
+                • Selalu sertakan <code>timestamp</code> (Unix epoch) agar time-series DB bekerja optimal.<br>
+                • Gunakan <strong>QoS 1 + Retain</strong> untuk state FSM agar subscriber baru langsung tahu state terakhir.<br>
+                • Untuk sensor data yang frekuensinya tinggi (1 detik), gunakan <strong>QoS 0</strong> untuk efisiensi bandwidth.
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <p>📄 Agro-Technology Melon — Master Node Documentation</p>
+            <p style="margin-top:6px;color:var(--text-muted)">Dibuat untuk Tim Cloud & MQTT • Last updated: Juni 2026</p>
+        </footer>
+
+    </main>
+</div>
+
+<script>
+    // Initialize Mermaid
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'dark',
+        themeVariables: {
+            darkMode: true,
+            background: 'transparent',
+            primaryColor: '#1e3a5f',
+            primaryTextColor: '#f1f5f9',
+            primaryBorderColor: '#60a5fa',
+            lineColor: '#475569',
+            secondaryColor: '#065f46',
+            tertiaryColor: '#4c1d95',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: '13px',
+            noteBkgColor: '#1e293b',
+            noteTextColor: '#94a3b8',
+            noteBorderColor: '#334155',
+            actorBkg: '#1e3a5f',
+            actorTextColor: '#f1f5f9',
+            actorBorder: '#60a5fa',
+            signalColor: '#94a3b8',
+            signalTextColor: '#f1f5f9'
+        },
+        flowchart: {
+            htmlLabels: true,
+            curve: 'basis',
+            padding: 16,
+            nodeSpacing: 50,
+            rankSpacing: 60
+        },
+        sequence: {
+            mirrorActors: false,
+            actorMargin: 80,
+            messageMargin: 40,
+            boxMargin: 10,
+            noteMargin: 10,
+            useMaxWidth: true
+        }
+    });
+
+    // Active nav link on scroll
+    const sections = document.querySelectorAll('.section, .hero');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const id = entry.target.getAttribute('id');
+                navLinks.forEach(link => {
+                    link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
+                });
+            }
+        });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+
+    sections.forEach(section => {
+        if (section.id) observer.observe(section);
+    });
+
+    // Close sidebar on mobile nav click
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                document.querySelector('.sidebar').classList.remove('open');
+            }
+        });
+    });
+
+    // Fade-in animation on scroll
+    const fadeEls = document.querySelectorAll('.fade-in');
+    const fadeObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.animationPlayState = 'running';
+            }
+        });
+    }, { threshold: 0.1 });
+    fadeEls.forEach(el => fadeObserver.observe(el));
+</script>
+
+</body>
+</html>

@@ -57,6 +57,9 @@ constexpr unsigned long NUTRIENT_TIMEOUT   =
 constexpr unsigned long CORRECTION_MIX_TIME = 
     60000UL;
 
+constexpr uint32_t PRE_IRRIGATION_MIX_TIME =
+    60000UL;
+
 // | DAILY MIX SCHEDULE
 
 constexpr uint8_t DAILY_MIX_HOUR =

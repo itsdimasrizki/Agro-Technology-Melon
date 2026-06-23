@@ -117,6 +117,14 @@ void FertigationFSM::update() {
             handleReady();
             break;
 
+        case FertigationState::PRE_IRRIGATION_MIX:
+            handlePreIrrigationMix();
+            break;
+
+        case FertigationState::PRE_IRRIGATION_VALIDATE:
+            handlePreIrrigationValidate();
+            break;
+
         case FertigationState::IRRIGATION:
             handleIrrigation();
             break;
@@ -347,7 +355,24 @@ void FertigationFSM::handleCorrectionMix() {
 
 void FertigationFSM::handleReady() {
     if(sensor.soilADC >= currentIrrigation.dryThreshold) {
-        changeState(FertigationState::IRRIGATION);
+        changeState(FertigationState::PRE_IRRIGATION_MIX);
+    }
+}
+
+void FertigationFSM::handlePreIrrigationMix() {
+    if(!stateInitialized) {
+        Serial.println("[FSM] Pre Irrigation Mix");
+
+        // relay mixer nyala disini
+        // relayManager.on(RELAY_MIXER);
+
+        stateInitialized = true;
+    }
+
+    if(millis() - stateStartTime >= PRE_IRRIGATION_MIX_TIME) {
+        // relayManager.off(RELAY_MIXER);
+
+        changeState(FertigationState::PRE_IRRIGATION_VALIDATE);
     }
 }
 
@@ -362,6 +387,18 @@ void FertigationFSM::handleIrrigation() {
         relayManager.off(RELAY_IRRIGATION);
 
         changeState(FertigationState::READY);
+    }
+}
+
+void FertigationFSM::handlePreIrrigationValidate() {
+    bool ppmOK = sensor.ppm >= targetPPM;
+
+    bool phOK = sensor.ph >= targetMinPH && sensor.ph <= targetMaxPH;
+
+    if(ppmOK && phOK) {
+        changeState(FertigationState::IRRIGATION);
+    } else {
+        changeState(FertigationState::CORRECT_PPM);
     }
 }
 

@@ -26,6 +26,10 @@ enum class FertigationState {
 
     READY,
 
+    PRE_IRRIGATION_MIX,
+
+    PRE_IRRIGATION_VALIDATE,
+
     IRRIGATION,
 
     ERROR

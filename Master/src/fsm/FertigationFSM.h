@@ -61,6 +61,10 @@ private:
 
     void handleReady();
 
+    void handlePreIrrigationMix();
+
+    void handlePreIrrigationValidate();
+
     void handleIrrigation();
 
     void saveRecovery();

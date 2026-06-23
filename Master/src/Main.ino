@@ -21,34 +21,38 @@
 
 #include "communication/ESPNowManager.h"
 
-RelayManager relay;
+#include "display/OLEDManager.h"
 
-// FLOW METERS
+//////////////////////////////////////////////////
+// OBJECTS
+//////////////////////////////////////////////////
+
+OLEDManager oled;
+RelayManager relay;
+RTCManager rtcManager;
+ESPNowManager espNow;
+
 FlowMeter flowWater(FLOW_WATER_PIN);
 FlowMeter flowA(FLOW_A_PIN);
 FlowMeter flowB(FLOW_B_PIN);
 
-// Water Level
 WaterLevel waterLevel(
     ULTRASONIC_TRIG,
     ULTRASONIC_ECHO
 );
 
-// Water Temperature
 WaterTempSensor waterTemp(
     DS18B20_PIN
 );
 
-RTCManager rtcManager;
-
-ESPNowManager espNow;
-
-// PH TDS
 PHSensor phSensor(PH_PIN);
 
 TDSSensor tdsSensor(TDS_PIN);
 
-// Sensor Manager
+//////////////////////////////////////////////////
+// SENSOR MANAGER
+//////////////////////////////////////////////////
+
 SensorManager sensorManager(
     waterTemp,
     phSensor,
@@ -60,11 +64,17 @@ SensorManager sensorManager(
     flowB
 );
 
-// Recipe
+//////////////////////////////////////////////////
+// RECIPE
+//////////////////////////////////////////////////
+
 RecipeManager recipeManager;
 IrrigationRecipe irrigationRecipe;
 
+//////////////////////////////////////////////////
 // FSM
+//////////////////////////////////////////////////
+
 FertigationFSM fsm(
     sensorManager,
     relay,
@@ -76,86 +86,184 @@ FertigationFSM fsm(
     flowB
 );
 
-// ISR
-void IRAM_ATTR flowWaterISR() {
+//////////////////////////////////////////////////
+// ISR FLOW METER
+//////////////////////////////////////////////////
+
+void IRAM_ATTR flowWaterISR()
+{
     flowWater.pulseCount++;
 }
 
-void IRAM_ATTR flowAISR() {
+void IRAM_ATTR flowAISR()
+{
     flowA.pulseCount++;
 }
 
-void IRAM_ATTR flowBISR() {
+void IRAM_ATTR flowBISR()
+{
     flowB.pulseCount++;
 }
 
-void setup() {
+//////////////////////////////////////////////////
+// SETUP
+//////////////////////////////////////////////////
+
+void setup()
+{
     Serial.begin(115200);
+    delay(1000);
+
+    Serial.println();
+    Serial.println("===== SMART AGRO MASTER =====");
+
+    //////////////////////////////////////////////////
+    // RELAY
+    //////////////////////////////////////////////////
 
     relay.begin();
+
+    //////////////////////////////////////////////////
+    // FLOW METER
+    //////////////////////////////////////////////////
 
     flowWater.begin(flowWaterISR);
     flowA.begin(flowAISR);
     flowB.begin(flowBISR);
+
+    //////////////////////////////////////////////////
+    // I2C
+    //////////////////////////////////////////////////
 
     Wire.begin(
         I2C_SDA_PIN,
         I2C_SCL_PIN
     );
 
+    //////////////////////////////////////////////////
+    // SENSORS
+    //////////////////////////////////////////////////
+
     waterLevel.begin();
     waterTemp.begin();
-    rtcManager.begin();
 
     phSensor.begin();
     tdsSensor.begin();
 
-    if(!espNow.begin()) {
-        Serial.println("ESP-NOW Error");
-    }
+    //////////////////////////////////////////////////
+    // RTC
+    //////////////////////////////////////////////////
+
+    rtcManager.begin();
+
+    //////////////////////////////////////////////////
+    // ESP NOW
+    //////////////////////////////////////////////////
 
     espNow.begin();
+
+    //////////////////////////////////////////////////
+    // OLED
+    //////////////////////////////////////////////////
+
+    oled.begin();
+    oled.showBoot();
+
+    delay(2000);
+
+    //////////////////////////////////////////////////
+    // FSM
+    //////////////////////////////////////////////////
 
     fsm.begin();
 
     Serial.println("System Ready");
-    delay(1000);
 }
 
-void loop() {
+//////////////////////////////////////////////////
+// LOOP
+//////////////////////////////////////////////////
+
+void loop()
+{
+    //////////////////////////////////////////////////
+    // UPDATE SYSTEM
+    //////////////////////////////////////////////////
+
     fsm.update();
+
+    SensorData data =
+        sensorManager.getData();
+
+    //////////////////////////////////////////////////
+    // OLED
+    //////////////////////////////////////////////////
+
+    static bool page = false;
+    static unsigned long lastPage = 0;
+
+    if (millis() - lastPage >= 5000)
+    {
+        lastPage = millis();
+
+        page = !page;
+    }
+
+    if (page)
+    {
+        oled.showSensor(
+            data.temperature,
+            data.ph,
+            data.ppm,
+            data.soilADC
+        );
+    }
+    else
+    {
+        oled.showFSM("MASTER");
+    }
+
+    //////////////////////////////////////////////////
+    // SERIAL MONITOR
+    //////////////////////////////////////////////////
+
     static unsigned long lastPrint = 0;
 
-    if(millis() - lastPrint >= 1000){
+    if (millis() - lastPrint >= 1000)
+    {
         lastPrint = millis();
 
-        SensorData data =
-            sensorManager.getData();
+        Serial.println();
 
-        Serial.print("Temp : ");
+        Serial.println("========== SENSOR ==========");
+
+        Serial.print("Temp        : ");
         Serial.println(data.temperature);
 
-        Serial.print("PH : ");
+        Serial.print("PH          : ");
         Serial.println(data.ph);
 
-        Serial.print("PPM : ");
+        Serial.print("PPM         : ");
         Serial.println(data.ppm);
 
-        Serial.print("Water : ");
+        Serial.print("Water Level : ");
         Serial.println(data.waterLevel);
 
-        Serial.print("Soil : ");
+        Serial.print("Soil ADC    : ");
         Serial.println(data.soilADC);
 
-        Serial.print("Flow Water : ");
+        Serial.print("Flow Water  : ");
         Serial.println(data.flowWater);
 
-        Serial.print("Flow A : ");
+        Serial.print("Flow A      : ");
         Serial.println(data.flowA);
 
-        Serial.print("Flow B : ");
+        Serial.print("Flow B      : ");
         Serial.println(data.flowB);
 
-        Serial.println("----------------");
+        Serial.print("Volume      : ");
+        Serial.println(data.currentVolume);
+
+        Serial.println("============================");
     }
 }

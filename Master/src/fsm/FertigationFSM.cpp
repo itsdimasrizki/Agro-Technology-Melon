@@ -39,10 +39,11 @@ nutrientBFlow(b)
 }
 
 // Begin
+// void FertigationFSM::begin() {
+//     changeState(FertigationState::WAIT_DAILY_MIX);
+// }
 void FertigationFSM::begin() {
-    changeState(
-        FertigationState::WAIT_DAILY_MIX
-    );
+    changeState(FertigationState::PREPARE_DAILY_MIX);
 }
 
 // Update

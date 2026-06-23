@@ -6,19 +6,18 @@ volatile bool
 ESPNowManager::newData =
 false;
 
-void ESPNowManager::begin() {
+bool ESPNowManager::begin() {
     WiFi.mode(WIFI_STA);
 
     if(esp_now_init() != ESP_OK) {
-        Serial.println(
-            "ESP-NOW Init Failed"
-        );
-        return;
+        Serial.println("ESP-NOW Init Failed");
+        return false;
     }
 
     esp_now_register_recv_cb(onDataRecv);
 
     Serial.println("ESP-NOW Ready");
+    return true;
 }
 
 void ESPNowManager::onDataRecv(

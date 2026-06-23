@@ -8,7 +8,7 @@
 
 class ESPNowManager {
 public:
-    void begin();
+    bool begin();
 
     bool hasNewData() const;
 

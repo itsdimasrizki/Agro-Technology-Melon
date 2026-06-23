@@ -5,6 +5,7 @@
 
 struct IrrigationConfig {
     uint16_t dryThreshold;
+    uint16_t wetThreshold;
 };
 
 class IrrigationRecipe {

@@ -231,9 +231,65 @@ void FertigationFSM::handleMixB() {
     }
 }
 
-void FertigationFSM::handleValidate(){}
-void FertigationFSM::handleCorrectPPM(){}
-void FertigationFSM::handleReady(){}
-void FertigationFSM::handleIrrigation(){}
+void FertigationFSM::handleValidate() {
+    // bool ppmOK = sensor.ppm >= targetPPM;
+
+    // bool phOK = sensor.ph >= targetMinPH && sensor.ph <= targetMaxPH;
+
+    // if(ppmOK && phOK) {
+    if (sensor.ppm >= targetPPM) {
+        changeState(FertigationState::READY);
+    } else {
+        changeState(FertigationState::CORRECT_PPM);
+    }
+}
+
+void FertigationFSM::handleCorrectPPM() {
+    if(sensor.ppm >= targetPPM) {
+        changeState(
+            FertigationState::READY
+        );
+
+        return;
+    }
+
+    if(!stateInitialized) {
+        nutrientAFlow.reset();
+        nutrientBFlow.reset();
+
+        relayManager.on(RELAY_NUTRIENT_A);
+
+        relayManager.on(RELAY_NUTRIENT_B);
+
+        stateInitialized = true;
+    }
+
+    if(sensor.flowA >= CORRECTION_DOSE
+        &&
+        sensor.flowB >= CORRECTION_DOSE
+    ) {
+        relayManager.off(RELAY_NUTRIENT_A);
+
+        relayManager.off(RELAY_NUTRIENT_B);
+
+        changeState(FertigationState::MIX_B);
+    }
+}
+
+void FertigationFSM::handleReady() {
+    if(sensor.soilADC >= currentIrrigation.dryThreshold) {
+        changeState(FertigationState::IRRIGATION);
+    }
+}
+
+void FertigationFSM::handleIrrigation() {
+    relayManager.on(RELAY_IRRIGATION);
+
+    if(sensor.soilADC <= currentIrrigation.wetThreshold) {
+        relayManager.off(RELAY_IRRIGATION);
+
+        changeState(FertigationState::READY);
+    }
+}
 
 void FertigationFSM::handleError(){}

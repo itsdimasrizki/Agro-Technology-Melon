@@ -1,17 +1,11 @@
 #ifndef PIN_CONFIG_H
 #define PIN_CONFIG_H
 
-// =========================
 // ANALOG SENSOR
-// =========================
-
 #define PH_PIN              1
 #define TDS_PIN             2
 
-// =========================
 // DIGITAL SENSOR
-// =========================
-
 #define DS18B20_PIN         4
 
 #define ULTRASONIC_TRIG     5

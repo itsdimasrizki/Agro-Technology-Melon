@@ -54,6 +54,11 @@ private:
     FlowMeter& flowWater;
     FlowMeter& flowA;
     FlowMeter& flowB;
+
+    // Throttle timestamp per sensor (millis)
+    unsigned long _lastTempUpdate;
+    unsigned long _lastPhTdsUpdate;
+    unsigned long _lastLevelUpdate;
 };
 
 #endif

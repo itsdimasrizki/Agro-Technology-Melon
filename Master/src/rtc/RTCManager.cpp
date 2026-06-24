@@ -1,47 +1,54 @@
 #include "RTCManager.h"
 
 void RTCManager::begin() {
-    rtc.begin();
-
-    if(!rtc.begin()) {
-        Serial.println("RTC Error");
-
-        while(true);
+    // Panggil begin() dua kali dihapus — cukup sekali
+    if (!rtc.begin()) {
+        Serial.println("[RTC] Inisialisasi gagal!");
+        _rtcOk = false;
+        return;
+        // Tidak menggunakan while(true) — FSM yang akan handle error ini
     }
+
+    _rtcOk = true;
+    _dt = rtc.now();
+}
+
+bool RTCManager::isOk() const {
+    return _rtcOk;
+}
+
+void RTCManager::refresh() {
+    if (!_rtcOk) return;
+
+    _dt = rtc.now();
 }
 
 DateTime RTCManager::now() {
-    return rtc.now();
+    return _dt;
 }
 
 uint16_t RTCManager::getPlantAgeDays() {
-    DateTime currentDate = rtc.now();
-
-    TimeSpan age = currentDate - plantingDate;
+    TimeSpan age = _dt - plantingDate;
 
     return age.days();
 }
 
 uint8_t RTCManager::getDay() {
-    return rtc.now().day();
+    return _dt.day();
 }
 
 uint8_t RTCManager::getMonth() {
-    return rtc.now().month();
+    return _dt.month();
 }
 
 uint16_t RTCManager::getYear() {
-    return rtc.now().year();
+    return _dt.year();
 }
 
 uint8_t RTCManager::getHour() {
-    DateTime now = rtc.now();
-
-    return now.hour();
+    return _dt.hour();
 }
 
 uint8_t RTCManager::getMinute() {
-    DateTime now = rtc.now();
-
-    return now.minute();
+    return _dt.minute();
 }

@@ -63,3 +63,14 @@ void FlowMeter::reset() {
 
     lastCalcTime = millis();
 }
+
+void FlowMeter::setPulseCount(uint32_t val) {
+    noInterrupts();
+
+    pulseCount = val;
+    lastPulseCount = val;
+
+    interrupts();
+
+    lastCalcTime = millis();
+}

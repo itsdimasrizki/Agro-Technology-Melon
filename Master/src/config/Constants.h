@@ -33,6 +33,10 @@ constexpr float INITIAL_NUTRIENT_B =
 constexpr float CORRECTION_DOSE =
     0.05f; // 50mL
 
+// batas maksimum iterasi koreksi PPM sebelum masuk ERROR
+constexpr uint8_t MAX_CORRECTION_COUNT =
+    10;
+
 constexpr uint32_t CORRECTION_DELAY =
     180000UL; // 3 menit
 
@@ -43,9 +47,6 @@ constexpr uint32_t MIX_A_TIME =
     300000UL; // 5 menit
 
 constexpr uint32_t MIX_B_TIME =
-    300000UL; // 5 menit
-
-constexpr uint32_t FINAL_MIX_TIME =
     300000UL; // 5 menit
 
 constexpr unsigned long WATER_FILL_TIMEOUT = 
@@ -72,4 +73,9 @@ constexpr uint8_t DAILY_MIX_MINUTE =
 constexpr float MIN_REMAINING_VOLUME =
     2.0f; // Liter
 
+constexpr uint16_t PPM_TOLERANCE =
+    50;
+
+constexpr uint16_t MAX_PPM_OVERDOSE =
+    100;
 #endif

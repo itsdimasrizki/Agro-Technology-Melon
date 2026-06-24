@@ -4,15 +4,17 @@
 #include <Preferences.h>
 
 struct RecoveryData {
-    uint8_t state;
+    uint16_t state;
 
     uint32_t waterPulse;
     uint32_t nutrientAPulse;
     uint32_t nutrientBPulse;
 
-    uint8_t day;
+    uint16_t day;
     uint8_t month;
     uint16_t year;
+
+    uint16_t lastStateBeforeError;
 
     bool batchRunning;
 };

@@ -20,5 +20,5 @@ RecoveryManager::load() {
 }
 
 void RecoveryManager::clear() {
-    prefs.clear();
+    prefs.remove("state");
 }

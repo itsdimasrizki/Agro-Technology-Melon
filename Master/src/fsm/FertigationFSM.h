@@ -12,6 +12,8 @@
 
 #include "../utils/RecoveryManager.h"
 
+#include "../utils/ErrorCode.h"
+
 class FertigationFSM {
 public:
     FertigationFSM(
@@ -37,47 +39,97 @@ private:
         FertigationState newState
     );
 
-    void handleIdle();
+    // --- Condition helpers ---
+    bool isTankSafeForMixing();
+    bool isPPMInRange();
+    bool isPPMOverdose();
+    bool isTodayAlreadyMixed();
+    bool isStateTimeout(unsigned long timeout);
 
-    void handleWaitDailyMix();
+    // --- Actuator helpers ---
+    void startMixer();
+    void stopMixer();
 
-    void handlePrepareDailyMix();
+    void startWaterFilling();
+    void stopWaterFilling();
 
-    void handleFillWater();
+    void startNutrientA();
+    void stopNutrientA();
 
-    void handleAddNutrientA();
+    void startNutrientB();
+    void stopNutrientB();
 
-    void handleMixA();
+    // --- Recipe ---
+    void prepareDailyRecipe();
 
-    void handleAddNutrientB();
+    // --- Mixing helpers ---
+    // Cek tank aman, nyalakan mixer, set stateInitialized.
+    // Return false jika gagal (masuk ERROR).
+    bool beginMixing();
 
-    void handleMixB();
+    // Return true saat mixTime tercapai, matikan mixer.
+    bool updateMixing(uint32_t mixTime);
 
-    void handleValidate();
+    // --- Transition helpers ---
+    void gotoReady();
+    void gotoValidate();
+    void gotoCorrection();
+    void gotoError(ErrorCode error);
 
-    void handleCorrectPPM();
+    // Kembali ke state validate yang sesuai dengan correctionOrigin
+    // (VALIDATE atau PRE_IRRIGATION_VALIDATE)
+    void gotoPostCorrection();
 
-    void handleCorrectionMix();
-
-    void handleReady();
-
-    void handlePreIrrigationMix();
-
-    void handlePreIrrigationValidate();
-
-    void handleIrrigation();
-
+    // --- Recovery helpers ---
     void saveRecovery();
-
     void restoreRecovery();
+    void clearRecovery();
 
-    void handleError();
+    // Encapsulate consuming recovery flag — set recovering=false dan log
+    void consumeRecovery();
 
-    void enterError();
-
+    // --- Error helpers ---
+    void enterError(ErrorCode error);
+    void setError(ErrorCode error);
+    void clearError();
     void recoverFromError();
 
+    // --- State handlers ---
+    // KONVENSI: setiap handler:
+    //   if (!stateInitialized) { ... stateInitialized = true; }
+    //   beginMixing() akan set stateInitialized = true jika berhasil.
+    //   Jika beginMixing() gagal, handler return tanpa set stateInitialized.
+    void handleIdle();
+    void handleWaitDailyMix();
+    void handlePrepareDailyMix();
+    void handleFillWater();
+    void handleAddNutrientA();
+    void handleMixA();
+    void handleAddNutrientB();
+    void handleMixB();
+    void handleValidate();
+    void handleCorrectPPM();
+    void handleCorrectionMix();
+    void handleReady();
+    void handlePreIrrigationMix();
+    void handlePreIrrigationValidate();
+    void handleIrrigation();
+    void handleError();
+
+    // --- Log helpers ---
+    void logStateTransition(FertigationState newState);
+    void logStateAction(const char* message);
+    void logRecipe(float remainingVolume, float ratio);
+    void logError();
+    void logError(const char* message);
+    void logRecovery(const char* message);
+    void logRecovery(const char* message, FertigationState recoveryState);
+
+    // Konversi FertigationState enum ke nama string untuk debug
+    const char* stateToString(FertigationState s);
+
 private:
+    ErrorCode currentError = ErrorCode::NONE;
     FertigationState state;
 
     unsigned long stateStartTime;
@@ -106,7 +158,8 @@ private:
     NutrientRecipe currentRecipe;
     IrrigationConfig currentIrrigation;
 
-    uint8_t lastMixDay;
+    // FIX: uint16_t agar tidak overflow setelah hari ke-255
+    uint16_t lastMixDay;
     uint8_t lastMixMonth;
     uint16_t lastMixYear;
 
@@ -117,6 +170,14 @@ private:
     bool waitingRecovery = false;
 
     bool recovering = false;
+
+    // Counter iterasi koreksi PPM — reset saat mulai siklus baru
+    uint8_t correctionCount = 0;
+
+    // Menyimpan state mana yang memulai koreksi PPM
+    // (VALIDATE atau PRE_IRRIGATION_VALIDATE)
+    // Digunakan oleh gotoPostCorrection() untuk kembali ke validate yang benar
+    FertigationState correctionOrigin = FertigationState::VALIDATE;
 };
 
 #endif

@@ -124,7 +124,7 @@ void setup() {
     fsm.begin();
 
     Serial.println("System Ready");
-    delay(1000);
+    delay(5000);
 }
 
 void loop() {
@@ -134,8 +134,7 @@ void loop() {
     if(millis() - lastPrint >= 1000){
         lastPrint = millis();
 
-        SensorData data =
-            sensorManager.getData();
+        SensorData data = sensorManager.getData();
 
         Serial.print("Temp : ");
         Serial.println(data.temperature);

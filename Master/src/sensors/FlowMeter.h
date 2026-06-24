@@ -16,6 +16,8 @@ public:
 
     void reset();
 
+    void setPulseCount(uint32_t val);
+
     volatile uint32_t pulseCount;
 
 private:

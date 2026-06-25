@@ -48,7 +48,7 @@ nutrientBFlow(b)
     correctionOrigin = FertigationState::VALIDATE;
 }
 
-// Begin
+//! Begin
 void FertigationFSM::begin() {
     if (!rtcManager.isOk()) {
         logError("[FSM] RTC gagal — masuk ERROR state");
@@ -70,7 +70,7 @@ void FertigationFSM::begin() {
 #endif
 }
 
-// Update
+//! Update
 void FertigationFSM::update() {
     rtcManager.refresh();
     sensorManager.update();
@@ -160,7 +160,7 @@ void FertigationFSM::update() {
     }
 }
 
-// ChangeState
+//! ChangeState
 void FertigationFSM::changeState(FertigationState newState) {
     state = newState;
     stateStartTime = millis();
@@ -169,14 +169,13 @@ void FertigationFSM::changeState(FertigationState newState) {
     logStateTransition(newState);
 }
 
-// GetState
+//! GetState
 FertigationState
 FertigationFSM::getState() const {
     return state;
 }
 
-// CONDITION HELPERS
-
+//! CONDITION HELPERS
 bool FertigationFSM::isTankSafeForMixing() {
     return sensor.tankVolume >= MIN_REMAINING_VOLUME;
 }
@@ -204,8 +203,7 @@ bool FertigationFSM::isStateTimeout(unsigned long timeout) {
     return millis() - stateStartTime > timeout;
 }
 
-// ACTUATOR HELPERS
-
+//! ACTUATOR HELPERS
 void FertigationFSM::startMixer() {
     relayManager.on(RELAY_PUMP_MIX);
 }
@@ -260,8 +258,7 @@ void FertigationFSM::stopNutrientB() {
     relayManager.off(RELAY_SOLENOID_B);
 }
 
-// RECIPE
-
+//! RECIPE
 void FertigationFSM::prepareDailyRecipe() {
     uint16_t age = rtcManager.getPlantAgeDays();
 
@@ -295,8 +292,7 @@ void FertigationFSM::prepareDailyRecipe() {
     logRecipe(remainingVolume, ratio);
 }
 
-// MIXING HELPERS
-
+//! MIXING HELPERS
 bool FertigationFSM::beginMixing() {
     if (!isTankSafeForMixing()) {
         logError("[FSM] Mixer Dry Run");
@@ -317,8 +313,7 @@ bool FertigationFSM::updateMixing(uint32_t mixTime) {
     return false;
 }
 
-// TRANSITION HELPERS
-
+//! TRANSITION HELPERS
 void FertigationFSM::gotoReady() {
     changeState(FertigationState::READY);
 }
@@ -344,8 +339,7 @@ void FertigationFSM::gotoPostCorrection() {
     }
 }
 
-// RECOVERY HELPERS
-
+//! RECOVERY HELPERS
 void FertigationFSM::consumeRecovery() {
     if (recovering) {
         logRecovery("[FSM] Resuming from recovery");
@@ -421,7 +415,7 @@ void FertigationFSM::clearRecovery() {
     recovery.clear();
 }
 
-// ERROR HELPERS
+//! ERROR HELPERS
 void FertigationFSM::enterError(ErrorCode error) {
     relayManager.allOff();
     setError(error);
@@ -450,7 +444,7 @@ void FertigationFSM::recoverFromError() {
     changeState(lastStateBeforeError);
 }
 
-// STATE HANDLERS
+//! STATE HANDLERS
 void FertigationFSM::handleIdle() {
     relayManager.allOff();
 }
@@ -509,7 +503,6 @@ void FertigationFSM::handlePreMixA() {
     }
 
     if (isStateTimeout(PRE_MIX_TANK_TIME)) {
-        // Pompa A tetap menyala ke depannya, hanya saja saat ADD_NUTRIENT_A solenoid-nya terbuka
         changeState(FertigationState::ADD_NUTRIENT_A);
     }
 }
@@ -609,7 +602,6 @@ void FertigationFSM::handlePreMixCorrection() {
     if (!stateInitialized) {
         consumeRecovery();
         
-        // Nyalakan Pompa A dan B (Solenoid tertutup)
         preMixNutrientA();
         preMixNutrientB();
 
@@ -618,7 +610,6 @@ void FertigationFSM::handlePreMixCorrection() {
     }
 
     if (isStateTimeout(PRE_MIX_CORRECTION_TIME)) {
-        // Jangan panggil stopPreMixNutrient, biarkan menyala untuk dosing selanjutnya
         changeState(FertigationState::CORRECT_PPM);
     }
 }
@@ -742,10 +733,7 @@ void FertigationFSM::handleError() {
     }
 }
 
-// ============================================================
-// LOG HELPERS
-// ============================================================
-
+//! LOG HELPERS
 const char* FertigationFSM::stateToString(FertigationState s) {
     switch (s) {
         case FertigationState::IDLE:                    return "IDLE";

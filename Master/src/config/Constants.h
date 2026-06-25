@@ -6,14 +6,13 @@
 //! GREENHOUSE CONFIGURATION
 constexpr uint16_t TOTAL_PLANTS = 80;
 
-constexpr float MAX_CONSUMPTION_PER_PLANT =
-    2.0f; // Liter/hari
+constexpr float MAX_CONSUMPTION_PER_PLANT = 2.0f; // Liter/hari
 
-constexpr float DAILY_TARGET_VOLUME = TOTAL_PLANTS * MAX_CONSUMPTION_PER_PLANT; // 160L
+// constexpr float DAILY_TARGET_VOLUME = TOTAL_PLANTS * MAX_CONSUMPTION_PER_PLANT; // 160L
+constexpr float DAILY_TARGET_VOLUME = 2.0f; // 2Liter (Uji Coba)
 
 //! BASE MIXING CONFIGURATION
-constexpr float BASE_TARGET_PPM =
-    850.0f;
+constexpr float BASE_TARGET_PPM = 850.0f;
 
 //! sementara, nanti dikalibrasi lapangan
 constexpr float INITIAL_NUTRIENT_A = 0.8f; // Liter
@@ -33,13 +32,15 @@ constexpr uint32_t CORRECTION_DELAY = 180000UL; // 3 menit
 //! MIXING TIME
 // <konfigurasi lapangan> (Waktu pengadukan bisa disesuaikan di lapangan)
 
-constexpr uint32_t PRE_MIX_TANK_TIME = 60000UL; // 1 menit
+// constexpr uint32_t PRE_MIX_TANK_TIME = 60000UL; // 1 menit
+// constexpr uint32_t PRE_MIX_CORRECTION_TIME = 60000UL; // 1 menit
+// constexpr uint32_t MIX_A_TIME = 300000UL; // 5 menit
+// constexpr uint32_t MIX_B_TIME = 300000UL; // 5 menit
 
-constexpr uint32_t PRE_MIX_CORRECTION_TIME = 60000UL; // 1 menit
-
-constexpr uint32_t MIX_A_TIME = 300000UL; // 5 menit
-
-constexpr uint32_t MIX_B_TIME = 300000UL; // 5 menit
+constexpr uint32_t PRE_MIX_TANK_TIME = 5000UL; // 5 detik (uji coba)
+constexpr uint32_t PRE_MIX_CORRECTION_TIME = 5000UL; // 5 detik (uji coba)
+constexpr uint32_t MIX_A_TIME = 10000UL; // 10 detik (uji coba)
+constexpr uint32_t MIX_B_TIME = 10000UL; // 10 detik (uji coba)
 
 constexpr unsigned long WATER_FILL_TIMEOUT = 1800000UL; // 30 menit
 

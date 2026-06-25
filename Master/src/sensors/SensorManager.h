@@ -1,12 +1,12 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
 
-#include "PHSensor.h"
-#include "TDSSensor.h"
-#include "WaterTempSensor.h"
-#include "WaterLevel.h"
+#include "sensors/PHSensor.h"
+#include "sensors/TDSSensor.h"
+#include "sensors/WaterTempSensor.h"
+#include "sensors/WaterLevel.h"
 #include "../communication/ESPNowManager.h"
-#include "FlowMeter.h"
+#include "sensors/FlowMeter.h"
 
 struct SensorData {
     float temperature;

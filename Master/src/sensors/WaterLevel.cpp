@@ -23,12 +23,7 @@ float WaterLevel::getDistanceCM() {
 
     digitalWrite(_trigPin, LOW);
 
-    long duration =
-        pulseIn(
-            _echoPin,
-            HIGH,
-            30000
-        );
+    long duration = pulseIn(_echoPin, HIGH, 30000);
 
     if(duration <= 0)
         return -1;
@@ -43,16 +38,9 @@ float WaterLevel::getLevelPercent() {
     if(distance < 0)
         return -1;
 
-    float level =
-        ((tankHeightCM - distance)
-        / tankHeightCM) * 100.0f;
+    float level = ((tankHeightCM - distance) / tankHeightCM) * 100.0f;
 
-    level =
-        constrain(
-            level,
-            0,
-            100
-        );
+    level = constrain(level, 0, 100);
 
     return level;
 }

@@ -9,10 +9,8 @@ public:
     void begin();
 
     // Baca satu kali dari RTC, simpan sebagai snapshot.
-    // Panggil di awal setiap loop agar semua getter konsisten.
     void refresh();
 
-    // Kembalikan true jika RTC berhasil diinisialisasi
     bool isOk() const;
 
     DateTime now();
@@ -32,7 +30,7 @@ private:
 
     DateTime plantingDate = DateTime(2026, 6, 1, 0, 0, 0);
 
-    // Snapshot hasil refresh() — semua getter membaca dari sini
+    // Snapshot hasil refresh()
     DateTime _dt;
 
     bool _rtcOk = false;

@@ -1,12 +1,10 @@
 #include "RTCManager.h"
 
 void RTCManager::begin() {
-    // Panggil begin() dua kali dihapus — cukup sekali
     if (!rtc.begin()) {
         Serial.println("[RTC] Inisialisasi gagal!");
         _rtcOk = false;
         return;
-        // Tidak menggunakan while(true) — FSM yang akan handle error ini
     }
 
     _rtcOk = true;

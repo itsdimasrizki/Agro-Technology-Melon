@@ -13,8 +13,8 @@
 // =========================================
 // WIFI & MQTT — isi sesuai environment kamu
 // =========================================
-#define WIFI_SSID       "NAMA_WIFI_KAMU"       // ganti dengan WiFi di greenhouse
-#define WIFI_PASSWORD   "PASSWORD_WIFI_KAMU"   // ganti dengan password WiFi
+#define WIFI_SSID       "SSID WIFI"       // ganti dengan WiFi di greenhouse
+#define WIFI_PASSWORD   "PASSWORD WIFI"   // ganti dengan password WiFi
 
 #define MQTT_BROKER     "aead004bf5144152b88233f1a1949418.s1.eu.hivemq.cloud"
 #define MQTT_PORT       8883                   // TLS port HiveMQ Cloud

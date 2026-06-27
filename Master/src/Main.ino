@@ -173,6 +173,9 @@ void loop() {
         Serial.print("Tank Volume : ");
         Serial.println(data.tankVolume);
 
+        Serial.print("MQTT : ");
+        Serial.println(mqtt.isConnected() ? "Connected" : "Disconnected");
+
         Serial.println("----------------");
     }
 }

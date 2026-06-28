@@ -6,6 +6,8 @@
 
 #include "communication/MQTTManager.h"
 
+#include "WiFi.h"
+
 #include "recipe/RecipeManager.h"
 #include "recipe/IrrigationRecipe.h"
 
@@ -50,7 +52,12 @@ ESPNowManager espNow;
 
 RecoveryManager recovery;
 
-MQTTManager mqtt(relay);
+// [HARDCODED LAMA] Constructor lama (tanpa config MQTT):
+// MQTTManager mqtt(relay);
+
+// [RUNTIME] Constructor baru: RTCManager & WaterLevel diperlukan untuk update config live
+MQTTManager mqtt(relay, rtcManager, waterLevel);
+
 
 // PH TDS
 PHSensor phSensor(PH_PIN);
@@ -185,6 +192,9 @@ void loop() {
 
         Serial.print("MQTT : ");
         Serial.println(mqtt.isConnected() ? "Connected" : "Disconnected");
+
+        Serial.print("ESP32 MAC Address: ");
+        Serial.println(WiFi.macAddress());
 
         Serial.println("----------------");
     }

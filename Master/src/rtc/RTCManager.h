@@ -24,13 +24,20 @@ public:
     uint8_t getMonth();
     uint16_t getYear();
 
+    // [RUNTIME] Set hari pertama tanam via MQTT (greenhouse/config/set)
+    // Field JSON: "planting_date": "YYYY-MM-DD"
+    void setPlantingDate(uint16_t year, uint8_t month, uint8_t day);
+
 private:
 
     RTC_PCF8563 rtc;
 
-    DateTime plantingDate = DateTime(2026, 6, 1, 0, 0, 0);
+    // [HARDCODED LAMA] Uncomment untuk hardcoded tanpa MQTT (testing):
+    // DateTime plantingDate = DateTime(2026, 6, 1, 0, 0, 0);
 
-    // Snapshot hasil refresh()
+    // [RUNTIME] Diisi di begin() dari RuntimeConfig, atau diupdate via setPlantingDate()
+    DateTime plantingDate;
+
     DateTime _dt;
 
     bool _rtcOk = false;

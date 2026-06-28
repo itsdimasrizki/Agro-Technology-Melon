@@ -1,6 +1,7 @@
 #include "FertigationFSM.h"
 #include "../config/Constants.h"
 #include "../config/SystemConfig.h"
+#include "../config/RuntimeConfig.h"
 
 FertigationFSM::FertigationFSM(
     SensorManager& sensors,
@@ -456,7 +457,11 @@ void FertigationFSM::handleWaitDailyMix() {
     uint8_t month  = rtcManager.getMonth();
     uint16_t year  = rtcManager.getYear();
 
-    if (hour == DAILY_MIX_HOUR && minute == DAILY_MIX_MINUTE && !isTodayAlreadyMixed()) {
+    // [HARDCODED LAMA] Uncomment untuk hardcoded tanpa MQTT (testing):
+    // if (hour == DAILY_MIX_HOUR && minute == DAILY_MIX_MINUTE && !isTodayAlreadyMixed()) {
+
+    // [RUNTIME] Baca jam mixing dari RuntimeConfig (diupdate via MQTT)
+    if (hour == gConfig.mixHour && minute == gConfig.mixMinute && !isTodayAlreadyMixed()) {
         lastMixDay   = day;
         lastMixMonth = month;
         lastMixYear  = year;

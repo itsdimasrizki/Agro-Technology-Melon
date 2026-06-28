@@ -4,12 +4,19 @@
 String MQTTManager::incomingCommand = "";
 bool   MQTTManager::commandFlag     = false;
 
+// [RUNTIME] Static buffer untuk config masuk
+String MQTTManager::incomingConfig = "";
+bool   MQTTManager::configFlag     = false;
+
 // =========================================
 // Constructor
 // =========================================
-MQTTManager::MQTTManager(RelayManager& relay)
+// [RUNTIME] Constructor baru: tambah RTCManager & WaterLevel untuk update config live
+MQTTManager::MQTTManager(RelayManager& relay, RTCManager& rtc, WaterLevel& level)
     : mqttClient(wifiClient),
-      relayManager(relay)
+      relayManager(relay),
+      rtcManager(rtc),
+      waterLevelSensor(level)
 {}
 
 // =========================================
@@ -38,6 +45,12 @@ void MQTTManager::update(
     }
 
     mqttClient.loop();
+
+    // [RUNTIME] Handle config yang masuk via TOPIC_CONFIG_SET
+    if (configFlag) {
+        applyConfig(incomingConfig);
+        configFlag = false;
+    }
 
     // Publish FSM state jika berubah
     if (fsmState != lastFSMState) {
@@ -142,7 +155,8 @@ bool MQTTManager::isConnected() {
 
 // =========================================
 // onMessage() — callback dari broker
-// Format JSON: {"relay":"irrigation","action":"on"}
+// Format CMD  : {"relay":"irrigation","action":"on"}
+// Format CONFIG: {"planting_date":"2026-06-01","mix_hour":5,...}
 // =========================================
 void MQTTManager::onMessage(
     const char* topic,
@@ -163,6 +177,138 @@ void MQTTManager::onMessage(
         incomingCommand = msg;
         commandFlag     = true;
     }
+    // [RUNTIME] Terima config dari dashboard/tool
+    else if (String(topic) == TOPIC_CONFIG_SET) {
+        incomingConfig = msg;
+        configFlag     = true;
+    }
+}
+
+// =========================================
+// [RUNTIME] applyConfig()
+// Parse JSON dari TOPIC_CONFIG_SET dan update gConfig,
+// RTCManager, serta WaterLevel secara live.
+//
+// Contoh JSON:
+// {
+//   "planting_date"       : "2026-06-01",
+//   "mix_hour"            : 5,
+//   "mix_minute"          : 0,
+//   "tank_height_cm"      : 45.0,
+//   "tank_capacity_liter" : 15.0
+// }
+// Setiap field opsional — hanya field yang ada yang diupdate.
+// =========================================
+void MQTTManager::applyConfig(const String& json) {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, json);
+
+    if (err) {
+        Serial.print("[CONFIG] JSON parse error: ");
+        Serial.println(err.c_str());
+        return;
+    }
+
+    bool changed = false;
+
+    // --- mix_hour ---
+    if (!doc["mix_hour"].isNull()) {
+        gConfig.mixHour = doc["mix_hour"].as<uint8_t>();
+        Serial.print("[CONFIG] mix_hour = ");
+        Serial.println(gConfig.mixHour);
+        changed = true;
+    }
+
+    // --- mix_minute ---
+    if (!doc["mix_minute"].isNull()) {
+        gConfig.mixMinute = doc["mix_minute"].as<uint8_t>();
+        Serial.print("[CONFIG] mix_minute = ");
+        Serial.println(gConfig.mixMinute);
+        changed = true;
+    }
+
+    // --- planting_date: format "YYYY-MM-DD" ---
+    if (!doc["planting_date"].isNull()) {
+        const char* dateStr = doc["planting_date"].as<const char*>();
+        int y, m, d;
+        if (sscanf(dateStr, "%d-%d-%d", &y, &m, &d) == 3) {
+            gConfig.plantingYear  = (uint16_t)y;
+            gConfig.plantingMonth = (uint8_t)m;
+            gConfig.plantingDay   = (uint8_t)d;
+            rtcManager.setPlantingDate(
+                gConfig.plantingYear,
+                gConfig.plantingMonth,
+                gConfig.plantingDay
+            );
+            changed = true;
+        } else {
+            Serial.println("[CONFIG] Format planting_date salah. Gunakan: YYYY-MM-DD");
+        }
+    }
+
+    // --- tank_height_cm ---
+    if (!doc["tank_height_cm"].isNull()) {
+        gConfig.tankHeightCM = doc["tank_height_cm"].as<float>();
+        changed = true;
+    }
+
+    // --- tank_capacity_liter ---
+    if (!doc["tank_capacity_liter"].isNull()) {
+        gConfig.tankCapacityLiter = doc["tank_capacity_liter"].as<float>();
+        changed = true;
+    }
+
+    // Update WaterLevel jika ada perubahan dimensi toren
+    if (!doc["tank_height_cm"].isNull() || !doc["tank_capacity_liter"].isNull()) {
+        waterLevelSensor.setTankConfig(
+            gConfig.tankHeightCM,
+            gConfig.tankCapacityLiter
+        );
+    }
+
+    if (changed) {
+        Serial.println("[CONFIG] Config berhasil diupdate.");
+        publishConfigStatus();
+    } else {
+        Serial.println("[CONFIG] Tidak ada field yang dikenali dalam JSON.");
+    }
+}
+
+// =========================================
+// [RUNTIME] publishConfigStatus()
+// Publish konfirmasi config aktif ke TOPIC_CONFIG_STATUS
+// =========================================
+void MQTTManager::publishConfigStatus() {
+    JsonDocument doc;
+    doc["device_id"] = MQTT_CLIENT_ID;
+    doc["timestamp"] = millis();
+
+    // Jam mixing
+    JsonObject mixing = doc["mix_schedule"].to<JsonObject>();
+    mixing["hour"]   = gConfig.mixHour;
+    mixing["minute"] = gConfig.mixMinute;
+
+    // Tanggal tanam
+    char dateStr[12];
+    snprintf(dateStr, sizeof(dateStr), "%04d-%02d-%02d",
+        gConfig.plantingYear,
+        gConfig.plantingMonth,
+        gConfig.plantingDay
+    );
+    doc["planting_date"] = dateStr;
+
+    // Ukuran toren
+    JsonObject tank = doc["tank"].to<JsonObject>();
+    tank["height_cm"]      = gConfig.tankHeightCM;
+    tank["capacity_liter"] = gConfig.tankCapacityLiter;
+
+    char buf[256];
+    serializeJson(doc, buf);
+
+    mqttClient.publish(TOPIC_CONFIG_STATUS, buf, true);
+
+    Serial.print("[CONFIG] Status dikirim: ");
+    Serial.println(buf);
 }
 
 // =========================================
@@ -213,6 +359,11 @@ void MQTTManager::connectMQTT() {
         mqttClient.subscribe(TOPIC_CMD);
         Serial.print("[MQTT] Subscribed to: ");
         Serial.println(TOPIC_CMD);
+
+        // [RUNTIME] Subscribe ke config topic
+        mqttClient.subscribe(TOPIC_CONFIG_SET);
+        Serial.print("[MQTT] Subscribed to: ");
+        Serial.println(TOPIC_CONFIG_SET);
     } else {
         Serial.print(" failed, rc=");
         Serial.println(mqttClient.state());
@@ -243,3 +394,4 @@ const char* MQTTManager::stateToString(FertigationState state) {
         default:                                        return "UNKNOWN";
     }
 }
+

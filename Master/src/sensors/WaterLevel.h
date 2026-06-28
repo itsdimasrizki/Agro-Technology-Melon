@@ -19,13 +19,22 @@ public:
     
     float getVolumeLiter();
 
+    // [RUNTIME] Set ukuran toren via MQTT (greenhouse/config/set)
+    // Field JSON: "tank_height_cm" dan/atau "tank_capacity_liter"
+    void setTankConfig(float heightCM, float capacityLiter);
+
 private:
 
     uint8_t _trigPin;
     uint8_t _echoPin;
 
-    float tankHeightCM = 45.0f; //50
-    float tankCapacityLiter = 15.0f; //500 
+    // [HARDCODED LAMA] Uncomment untuk hardcoded tanpa MQTT (testing):
+    // float tankHeightCM      = 45.0f;  // tinggi toren (cm)
+    // float tankCapacityLiter = 15.0f;  // kapasitas toren (liter)
+
+    // [RUNTIME] Diisi di begin() dari RuntimeConfig, atau diupdate via setTankConfig()
+    float tankHeightCM;
+    float tankCapacityLiter;
 };
 
 #endif

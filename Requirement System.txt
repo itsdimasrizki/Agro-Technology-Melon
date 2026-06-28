@@ -1,0 +1,74 @@
+- Tampilan untuk
+  - PH 
+	Over - Normal - Down
+	Mengikuti Resep
+  - TDS 
+	Over - Normal - Down
+	Mengikuti Resep
+  - Suhu Air
+  - Level Air (Liter)
+  - Ukuran Toren
+  - Flow Sensor
+	Flow Air
+	Flow Nutrisi A
+	Flow Nutrisi B
+  - Solenoid
+	Solenoid Air
+	Solenoid Nutrisi A
+	Solenoid Nutrisi B
+	Solenoid Irigasi
+  - Proses Kondisi State
+     	WAIT_DAILY_MIX (Tunggu Jam Mixing)
+
+    	PREPARE_DAILY_MIX (Cek Volume)
+
+    	FILL_WATER (Isi Air (Banyaknya air mengikuti sisa volume)
+
+    	PRE_MIX_A (A di aduk)
+
+    	ADD_NUTRIENT_A (A dimasukkan)
+
+    	MIX_A (A di mix dengan Air)
+
+    	PRE_MIX_B (B di aduk)
+
+    	ADD_NUTRIENT_B (B dimasukkan)
+
+    	MIX_B (B di mix dengan Air+A)
+
+    	VALIDATE (Validasi PPM & PH)
+	
+		Jika tidak Valid
+    	PRE_MIX_CORRECTION (A sama B Diaduk dulu) 
+
+    	CORRECT_PPM (A & B dimasukkan bersamaan 1:1)
+
+    	CORRECTION_MIX (Mix)
+		Selanjutnya Kembali ke VALIDATE dan terulang hingga sesuai)
+    	
+	READY (Tunggu Waktu irigasi (menurut kelembapan SLEEVE)
+		
+		Jika sudah mendapatkan data SLEEVE dan waktunya untuk irigasi)
+    	PRE_IRRIGATION_MIX (Mixing Cham diaduk dulu)
+
+    	PRE_IRRIGATION_VALIDATE (Di validasi ulang PH PPM)
+	
+		jika tidak sesuai dilempar Kembali ke CORRECT_PPM
+		jika sesuai
+    	IRRIGATION (Irigasi dimulai)
+
+    	ERROR (Jika Salah satu alat rusak/PPM terlalu tinggi)
+
+  - Kelembapan
+
+- INPUT
+  - Input Hari Pertama Penanaman
+  - Input Jam Mixing
+  - Input Ukuran Toren
+
+- ERROR State
+  - Jika error maka seluruh relay mati sehingga system berhenti 100%
+  - Kolom nyala kan Kembali relay atau system menurut bagian yang error
+	ex
+	Jika A error karna tidak mendeteksi flow, maka relay A akan tertutup dan system berhenti, di Web butuh adanya tombol untuk menyalakan Kembali system di A setelah direpairing, jika tidak di repairing maka system akan tetap berhenti. Jika sudah maka system akan lanjut nyala sesuai dengan state yang nyala
+	

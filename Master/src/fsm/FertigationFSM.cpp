@@ -46,6 +46,8 @@ nutrientBFlow(b)
     lastMixMonth = 0;
     lastMixYear = 0;
 
+    lastPulseTime = 0;
+    pulseOpenState = false;
     correctionOrigin = FertigationState::VALIDATE;
 }
 
@@ -512,13 +514,32 @@ void FertigationFSM::handleAddNutrientA() {
 
     if (!stateInitialized) {
         consumeRecovery();
-        startNutrientA();
+        lastPulseTime = millis();
+        pulseOpenState = true;
+        relayManager.on(RELAY_PUMP_A);
+        relayManager.on(RELAY_SOLENOID_A);
         stateInitialized = true;
-        logStateAction("[FSM] Dosing Nutrient A");
+        logStateAction("[FSM] Dosing Nutrient A (Pulsed)");
+    }
+
+    // Solenoid A / Pompa A pulsing (buka 1s, tutup 1s)
+    if (millis() - lastPulseTime >= 1000) {
+        pulseOpenState = !pulseOpenState;
+        lastPulseTime = millis();
+        if (pulseOpenState) {
+            relayManager.on(RELAY_PUMP_A);
+            relayManager.on(RELAY_SOLENOID_A);
+            logStateAction("[FSM] Nutrient A Solenoid OPEN");
+        } else {
+            relayManager.off(RELAY_PUMP_A);
+            relayManager.off(RELAY_SOLENOID_A);
+            logStateAction("[FSM] Nutrient A Solenoid CLOSED");
+        }
     }
 
     if (sensor.flowA >= targetNutrientA) {
-        stopNutrientA();
+        relayManager.off(RELAY_PUMP_A);
+        relayManager.off(RELAY_SOLENOID_A);
         changeState(FertigationState::MIX_A);
     }
 }
@@ -557,13 +578,32 @@ void FertigationFSM::handleAddNutrientB() {
 
     if (!stateInitialized) {
         consumeRecovery();
-        startNutrientB();
+        lastPulseTime = millis();
+        pulseOpenState = true;
+        relayManager.on(RELAY_PUMP_B);
+        relayManager.on(RELAY_SOLENOID_B);
         stateInitialized = true;
-        logStateAction("[FSM] Dosing Nutrient B");
+        logStateAction("[FSM] Dosing Nutrient B (Pulsed)");
+    }
+
+    // Solenoid B / Pompa B pulsing (buka 1s, tutup 1s)
+    if (millis() - lastPulseTime >= 1000) {
+        pulseOpenState = !pulseOpenState;
+        lastPulseTime = millis();
+        if (pulseOpenState) {
+            relayManager.on(RELAY_PUMP_B);
+            relayManager.on(RELAY_SOLENOID_B);
+            logStateAction("[FSM] Nutrient B Solenoid OPEN");
+        } else {
+            relayManager.off(RELAY_PUMP_B);
+            relayManager.off(RELAY_SOLENOID_B);
+            logStateAction("[FSM] Nutrient B Solenoid CLOSED");
+        }
     }
 
     if (sensor.flowB >= targetNutrientB) {
-        stopNutrientB();
+        relayManager.off(RELAY_PUMP_B);
+        relayManager.off(RELAY_SOLENOID_B);
         changeState(FertigationState::MIX_B);
     }
 }
@@ -619,16 +659,62 @@ void FertigationFSM::handleCorrectPPM() {
             nutrientBFlow.reset();
         }
 
-        startNutrientA();
-        startNutrientB();
+        lastPulseTime = millis();
+        pulseOpenState = true;
+
+        if (sensor.flowA < CORRECTION_DOSE) {
+            relayManager.on(RELAY_PUMP_A);
+            relayManager.on(RELAY_SOLENOID_A);
+        }
+        if (sensor.flowB < CORRECTION_DOSE) {
+            relayManager.on(RELAY_PUMP_B);
+            relayManager.on(RELAY_SOLENOID_B);
+        }
 
         stateInitialized = true;
-        logStateAction("[FSM] Injeksi Dosis Koreksi PPM");
+        logStateAction("[FSM] Injeksi Dosis Koreksi PPM (Pulsed)");
+    }
+
+    // Pulsing solenoid Nutrisi A & B bersamaan (buka 1s, tutup 1s)
+    if (millis() - lastPulseTime >= 1000) {
+        pulseOpenState = !pulseOpenState;
+        lastPulseTime = millis();
+
+        if (pulseOpenState) {
+            if (sensor.flowA < CORRECTION_DOSE) {
+                relayManager.on(RELAY_PUMP_A);
+                relayManager.on(RELAY_SOLENOID_A);
+                logStateAction("[FSM] Nutrient A Solenoid OPEN (Correction)");
+            }
+            if (sensor.flowB < CORRECTION_DOSE) {
+                relayManager.on(RELAY_PUMP_B);
+                relayManager.on(RELAY_SOLENOID_B);
+                logStateAction("[FSM] Nutrient B Solenoid OPEN (Correction)");
+            }
+        } else {
+            relayManager.off(RELAY_PUMP_A);
+            relayManager.off(RELAY_SOLENOID_A);
+            relayManager.off(RELAY_PUMP_B);
+            relayManager.off(RELAY_SOLENOID_B);
+            logStateAction("[FSM] Nutrient A & B Solenoids CLOSED (Correction)");
+        }
+    }
+
+    // Matikan segera jika sudah melampaui target
+    if (sensor.flowA >= CORRECTION_DOSE) {
+        relayManager.off(RELAY_PUMP_A);
+        relayManager.off(RELAY_SOLENOID_A);
+    }
+    if (sensor.flowB >= CORRECTION_DOSE) {
+        relayManager.off(RELAY_PUMP_B);
+        relayManager.off(RELAY_SOLENOID_B);
     }
 
     if (sensor.flowA >= CORRECTION_DOSE && sensor.flowB >= CORRECTION_DOSE) {
-        stopNutrientA();
-        stopNutrientB();
+        relayManager.off(RELAY_PUMP_A);
+        relayManager.off(RELAY_SOLENOID_A);
+        relayManager.off(RELAY_PUMP_B);
+        relayManager.off(RELAY_SOLENOID_B);
         changeState(FertigationState::CORRECTION_MIX);
     }
 }

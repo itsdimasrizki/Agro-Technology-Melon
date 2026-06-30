@@ -180,6 +180,10 @@ private:
 
     bool recovering = false;
 
+    // Timer dan status untuk pulsing solenoid Nutrisi A & B (buka-tutup 1 detik)
+    unsigned long lastPulseTime = 0;
+    bool pulseOpenState = false;
+
     // Menyimpan state mana yang memulai koreksi PPM
     // (VALIDATE atau PRE_IRRIGATION_VALIDATE)
     // Digunakan oleh gotoPostCorrection() untuk kembali ke validate yang benar

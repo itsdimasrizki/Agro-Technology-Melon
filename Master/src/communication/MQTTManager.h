@@ -9,33 +9,47 @@
 #include "../sensors/SensorManager.h"
 #include "../actuators/RelayManager.h"
 #include "../fsm/FertigationState.h"
+#include "../config/ConfigManager.h"
+#include "../rtc/RTCManager.h"
+#include "../sensors/WaterLevel.h"
 
 // =========================================
 // WIFI & MQTT — isi sesuai environment kamu
 // =========================================
-#define WIFI_SSID       "SSID WIFI"       // ganti dengan WiFi di greenhouse
-#define WIFI_PASSWORD   "PASSWORD WIFI"   // ganti dengan password WiFi
+#include "WiFiCredentials.h"
 
-#define MQTT_BROKER     "aead004bf5144152b88233f1a1949418.s1.eu.hivemq.cloud"
-#define MQTT_PORT       8883                   // TLS port HiveMQ Cloud
-#define MQTT_CLIENT_ID  "greenhouse-master-01"
-#define MQTT_USER       "greenhouse_esp32"
-#define MQTT_PASS       "Kebonagungpanenmelon1"
+#define MQTT_BROKER    "aead004bf5144152b88233f1a1949418.s1.eu.hivemq.cloud"
+#define MQTT_PORT      8883
+#define MQTT_CLIENT_ID "greenhouse-master-01"
+#define MQTT_USER      "greenhouse_esp32"
+#define MQTT_PASS      "Kebonagungpanenmelon1"
 
 // =========================================
-// MQTT TOPICS
+// MQTT TOPICS — Telemetry (publish)
 // =========================================
 #define TOPIC_SENSORS       "greenhouse/sensors"
 #define TOPIC_FSM_STATE     "greenhouse/fsm/state"
 #define TOPIC_RELAY_STATUS  "greenhouse/actuators/status"
+#define TOPIC_CONFIG_ACK    "greenhouse/config/ack"
+
+// =========================================
+// MQTT TOPICS — Commands (subscribe)
+// =========================================
 #define TOPIC_CMD           "greenhouse/actuators/cmd"
+#define TOPIC_CFG_PPM       "greenhouse/config/ppm"
+#define TOPIC_CFG_PH        "greenhouse/config/ph"
+#define TOPIC_CFG_RECIPE    "greenhouse/config/recipe"
+#define TOPIC_CFG_IRRIG     "greenhouse/config/irrigation"
+#define TOPIC_CFG_SYSTEM    "greenhouse/config/system"
+#define TOPIC_CFG_SCHEDULE  "greenhouse/config/schedule"
 
 // Interval publish sensor (ms)
 #define MQTT_PUBLISH_INTERVAL 5000UL
 
 class MQTTManager {
 public:
-    MQTTManager(RelayManager& relay);
+    MQTTManager(RelayManager& relay, ConfigManager& config,
+                RTCManager& rtc, WaterLevel& waterLevel);
 
     // Panggil di setup()
     void begin();
@@ -62,19 +76,32 @@ private:
     void connectMQTT();
 
     void publishSensors(const SensorData& data);
+    void publishConfigAck(const char* configName, bool success);
 
-    static void onMessage(
-        const char* topic,
-        byte* payload,
-        unsigned int length
-    );
+    // Non-static handler — bisa akses member
+    void handleMessage(const char* topic, const String& payload);
+
+    // Config handlers
+    void handleConfigPPM(const JsonDocument& doc);
+    void handleConfigPH(const JsonDocument& doc);
+    void handleConfigRecipe(const JsonDocument& doc);
+    void handleConfigIrrigation(const JsonDocument& doc);
+    void handleConfigSystem(const JsonDocument& doc);
+    void handleConfigSchedule(const JsonDocument& doc);
+
+    // Static callback PubSubClient — gunakan pointer ke instance
+    static void onMessage(const char* topic, byte* payload, unsigned int length);
+    static MQTTManager* _instance;
 
     static String incomingCommand;
     static bool   commandFlag;
 
     WiFiClientSecure wifiClient;
-    PubSubClient mqttClient;
-    RelayManager& relayManager;
+    PubSubClient     mqttClient;
+    RelayManager&    relayManager;
+    ConfigManager&   configManager;
+    RTCManager&      rtcManager;
+    WaterLevel&      waterLevel;
 
     unsigned long lastPublish = 0;
     FertigationState lastFSMState = FertigationState::IDLE;

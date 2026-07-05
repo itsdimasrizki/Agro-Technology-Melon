@@ -3,8 +3,7 @@
 SoilData ESPNowManager::receivedData;
 
 volatile bool
-ESPNowManager::newData =
-false;
+ESPNowManager::newData = false;
 
 bool ESPNowManager::begin() {
     WiFi.mode(WIFI_STA);

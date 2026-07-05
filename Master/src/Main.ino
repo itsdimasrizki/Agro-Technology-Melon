@@ -1,6 +1,7 @@
 #include <Wire.h>
 
 #include "config/PinConfig.h"
+#include "config/ConfigManager.h"
 
 #include "actuators/RelayManager.h"
 
@@ -22,13 +23,13 @@
 #include "fsm/FertigationFSM.h"
 
 #include "communication/ESPNowManager.h"
-#include "communication/MQTTManager.h"
 
 #include "utils/RecoveryManager.h"
 
 RelayManager relay;
 
 // FLOW METERS
+// Gunakan PinConfig.h pins
 FlowMeter flowWater(FLOW_WATER_PIN);
 FlowMeter flowA(FLOW_A_PIN);
 FlowMeter flowB(FLOW_B_PIN);
@@ -50,7 +51,9 @@ ESPNowManager espNow;
 
 RecoveryManager recovery;
 
-MQTTManager mqtt(relay);
+ConfigManager configManager;
+
+MQTTManager mqtt(relay, configManager, rtcManager, waterLevel);
 
 // PH TDS
 PHSensor phSensor(PH_PIN);
@@ -70,8 +73,8 @@ SensorManager sensorManager(
 );
 
 // Recipe
-RecipeManager recipeManager;
-IrrigationRecipe irrigationRecipe;
+RecipeManager recipeManager(configManager);
+IrrigationRecipe irrigationRecipe(configManager);
 
 // FSM
 FertigationFSM fsm(
@@ -83,7 +86,8 @@ FertigationFSM fsm(
     flowWater,
     flowA,
     flowB,
-    recovery
+    recovery,
+    configManager
 );
 
 // ISR
@@ -102,6 +106,9 @@ void IRAM_ATTR flowBISR() {
 void setup() {
     Serial.begin(115200);
 
+    // 1. Inisialisasi ConfigManager
+    configManager.begin();
+
     relay.begin();
 
     flowWater.begin(flowWaterISR);
@@ -114,8 +121,15 @@ void setup() {
     );
 
     waterLevel.begin();
+    // Propagate config ke WaterLevel
+    waterLevel.setTankCapacity(configManager.getTankCapacityLiter());
+
     waterTemp.begin();
+    
     rtcManager.begin();
+    // Propagate config ke RTCManager
+    rtcManager.setPlantingDate(configManager.getPlantYear(), configManager.getPlantMonth(), configManager.getPlantDay());
+    rtcManager.setDailyMixSchedule(configManager.getDailyMixHour(), configManager.getDailyMixMinute());
 
     recovery.begin();
 

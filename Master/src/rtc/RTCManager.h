@@ -24,11 +24,21 @@ public:
     uint8_t getMonth();
     uint16_t getYear();
 
+    // Dipanggil ConfigManager setelah load/update dari MQTT
+    void setPlantingDate(uint16_t year, uint8_t month, uint8_t day);
+    void setDailyMixSchedule(uint8_t hour, uint8_t minute);
+
+    uint8_t getDailyMixHour()   const { return _dailyMixHour; }
+    uint8_t getDailyMixMinute() const { return _dailyMixMinute; }
+
 private:
 
     RTC_PCF8563 rtc;
 
     DateTime plantingDate = DateTime(2026, 6, 1, 0, 0, 0);
+
+    uint8_t _dailyMixHour   = 5;
+    uint8_t _dailyMixMinute = 0;
 
     // Snapshot hasil refresh()
     DateTime _dt;

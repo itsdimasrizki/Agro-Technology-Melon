@@ -1,19 +1,23 @@
 #include "RecipeManager.h"
-#include "SecretRecipe.h"
 
-NutrientRecipe RecipeManager::getRecipe(
-    uint16_t ageDays
-)
-{
+RecipeManager::RecipeManager(ConfigManager& config)
+    : _config(config)
+{}
+
+NutrientRecipe RecipeManager::getRecipe(uint16_t ageDays) {
     NutrientRecipe recipe = {
-        DEFAULT_PPM,
-        DEFAULT_MIN_PH,
-        DEFAULT_MAX_PH
+        0.0f,
+        _config.getDefaultMinPH(),
+        _config.getDefaultMaxPH()
     };
 
-    for (int i = 0; i < NUM_STAGES; i++) {
-        if (ageDays <= RECIPE_STAGES[i].maxAgeDays) {
-            recipe.targetPPM = RECIPE_STAGES[i].targetPPM;
+    uint8_t numStages = _config.getNumRecipeStages();
+    for (uint8_t i = 0; i < numStages; i++) {
+        RecipeStageConfig stage = _config.getRecipeStage(i);
+        if (ageDays <= stage.maxAgeDays) {
+            recipe.targetPPM    = stage.targetPPM;
+            recipe.targetMinPH  = stage.minPH;
+            recipe.targetMaxPH  = stage.maxPH;
             break;
         }
     }

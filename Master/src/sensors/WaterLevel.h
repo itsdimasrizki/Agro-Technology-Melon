@@ -24,8 +24,12 @@ private:
     uint8_t _trigPin;
     uint8_t _echoPin;
 
-    float tankHeightCM = 45.0f; //50
-    float tankCapacityLiter = 15.0f; //500 
+    float tankHeightCM      = 45.0f;
+    float tankCapacityLiter = 15.0f;
+
+public:
+    // Dipanggil ConfigManager setelah load config dari NVS/MQTT
+    void setTankCapacity(float capacityLiter) { tankCapacityLiter = capacityLiter; }
 };
 
 #endif

@@ -50,3 +50,14 @@ uint8_t RTCManager::getHour() {
 uint8_t RTCManager::getMinute() {
     return _dt.minute();
 }
+
+void RTCManager::setPlantingDate(uint16_t year, uint8_t month, uint8_t day) {
+    plantingDate = DateTime(year, month, day, 0, 0, 0);
+    Serial.printf("[RTC] Planting date set: %04d-%02d-%02d\n", year, month, day);
+}
+
+void RTCManager::setDailyMixSchedule(uint8_t hour, uint8_t minute) {
+    _dailyMixHour   = hour;
+    _dailyMixMinute = minute;
+    Serial.printf("[RTC] Daily mix schedule: %02d:%02d\n", hour, minute);
+}

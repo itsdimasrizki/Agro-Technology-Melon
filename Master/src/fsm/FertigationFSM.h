@@ -11,6 +11,7 @@
 #include "../recipe/IrrigationRecipe.h"
 
 #include "../utils/RecoveryManager.h"
+#include "../config/ConfigManager.h"
 
 #include "../utils/ErrorCode.h"
 
@@ -25,7 +26,8 @@ public:
         FlowMeter& water,
         FlowMeter& a,
         FlowMeter& b,
-        RecoveryManager& recovery
+        RecoveryManager& recovery,
+        ConfigManager& config
     );
 
     void begin();
@@ -42,7 +44,6 @@ private:
     // --- Condition helpers ---
     bool isTankSafeForMixing();
     bool isPPMInRange();
-    bool isPPMOverdose();
     bool isTodayAlreadyMixed();
     bool isStateTimeout(unsigned long timeout);
 
@@ -157,6 +158,7 @@ private:
     RecipeManager& recipeManager;
     IrrigationRecipe& irrigationRecipe;
     RecoveryManager& recovery;
+    ConfigManager& configManager;
 
     FlowMeter& waterFlow;
     FlowMeter& nutrientAFlow;
@@ -178,8 +180,9 @@ private:
 
     bool recovering = false;
 
-    // Counter iterasi koreksi PPM — reset saat mulai siklus baru
-    uint8_t correctionCount = 0;
+    // Timer dan status untuk pulsing solenoid Nutrisi A & B (buka-tutup 1 detik)
+    unsigned long lastPulseTime = 0;
+    bool pulseOpenState = false;
 
     // Menyimpan state mana yang memulai koreksi PPM
     // (VALIDATE atau PRE_IRRIGATION_VALIDATE)

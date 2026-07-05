@@ -2,6 +2,7 @@
 #define IRRIGATION_RECIPE_H
 
 #include <stdint.h>
+#include "../config/ConfigManager.h"
 
 struct IrrigationConfig {
     uint16_t dryThreshold;
@@ -10,9 +11,12 @@ struct IrrigationConfig {
 
 class IrrigationRecipe {
 public:
-    IrrigationConfig getRecipe(
-        uint16_t ageDays
-    );
+    IrrigationRecipe(ConfigManager& config);
+
+    IrrigationConfig getRecipe(uint16_t ageDays);
+
+private:
+    ConfigManager& _config;
 };
 
 #endif

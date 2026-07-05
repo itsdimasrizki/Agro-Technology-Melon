@@ -2,6 +2,7 @@
 #define RECIPE_MANAGER_H
 
 #include <Arduino.h>
+#include "../config/ConfigManager.h"
 
 struct NutrientRecipe {
     float targetPPM;
@@ -11,10 +12,12 @@ struct NutrientRecipe {
 
 class RecipeManager {
 public:
+    RecipeManager(ConfigManager& config);
 
-    NutrientRecipe getRecipe(
-        uint16_t ageDays
-    );
+    NutrientRecipe getRecipe(uint16_t ageDays);
+
+private:
+    ConfigManager& _config;
 };
 
 #endif

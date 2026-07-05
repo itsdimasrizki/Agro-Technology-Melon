@@ -1,16 +1,19 @@
 #include "IrrigationRecipe.h"
-#include "SecretIrrigationRecipe.h"
 
-IrrigationConfig
-IrrigationRecipe::getRecipe(uint16_t ageDays) {
-    IrrigationConfig config = {
-        DEFAULT_DRY_THRESHOLD
-    };
+IrrigationRecipe::IrrigationRecipe(ConfigManager& config)
+    : _config(config)
+{}
 
-    for(size_t i = 0;i < NUM_IRRIGATION_STAGES;i++) {
-        if(ageDays <= IRRIGATION_STAGES[i].maxAgeDays) {
-            config.dryThreshold = IRRIGATION_STAGES[i].dryThreshold;
-            config.wetThreshold = IRRIGATION_STAGES[i].wetThreshold;
+IrrigationConfig IrrigationRecipe::getRecipe(uint16_t ageDays) {
+    // Default fallback (stage pertama jika tidak ada yang cocok)
+    IrrigationConfig config = {3900, 3650};
+
+    uint8_t numStages = _config.getNumIrrigationStages();
+    for (uint8_t i = 0; i < numStages; i++) {
+        IrrigationStageConfig stage = _config.getIrrigationStage(i);
+        if (ageDays <= stage.maxAgeDays) {
+            config.dryThreshold = stage.dryThreshold;
+            config.wetThreshold = stage.wetThreshold;
             break;
         }
     }

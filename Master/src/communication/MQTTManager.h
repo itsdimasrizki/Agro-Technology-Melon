@@ -12,6 +12,7 @@
 #include "../config/ConfigManager.h"
 #include "../rtc/RTCManager.h"
 #include "../sensors/WaterLevel.h"
+#include "../utils/ErrorCode.h"
 
 // =========================================
 // WIFI & MQTT — isi sesuai environment kamu
@@ -55,10 +56,10 @@ public:
     void begin();
 
     // Panggil di loop() — handle reconnect + publish interval
-    void update(const SensorData& sensorData, FertigationState fsmState);
+    void update(const SensorData& sensorData, FertigationState fsmState, ErrorCode errorCode = ErrorCode::NONE);
 
     // Publish FSM state saat berubah (panggil dari FSM atau Main)
-    void publishFSMState(FertigationState state);
+    void publishFSMState(FertigationState state, ErrorCode errorCode = ErrorCode::NONE);
 
     // Publish status relay saat ada perubahan
     void publishRelayStatus();
@@ -108,6 +109,7 @@ private:
 
     // Helper: konversi enum ke string
     const char* stateToString(FertigationState state);
+    const char* errorCodeToString(ErrorCode error);
 };
 
 #endif

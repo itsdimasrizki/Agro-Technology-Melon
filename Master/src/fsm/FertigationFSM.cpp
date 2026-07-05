@@ -196,6 +196,12 @@ FertigationFSM::getState() const {
     return state;
 }
 
+//! GetError
+ErrorCode
+FertigationFSM::getError() const {
+    return currentError;
+}
+
 //! CONDITION HELPERS
 bool FertigationFSM::isTankSafeForMixing() {
     return sensor.tankVolume >= 0.0f;

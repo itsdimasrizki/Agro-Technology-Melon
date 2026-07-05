@@ -154,7 +154,7 @@ void loop() {
     fsm.update();
 
     SensorData sensorData = sensorManager.getData();
-    mqtt.update(sensorData, fsm.getState());
+    mqtt.update(sensorData, fsm.getState(), fsm.getError());
 
     static unsigned long lastPrint = 0;
 

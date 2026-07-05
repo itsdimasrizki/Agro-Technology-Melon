@@ -37,7 +37,8 @@ void MQTTManager::begin() {
 // =========================================
 void MQTTManager::update(
     const SensorData& sensorData,
-    FertigationState fsmState
+    FertigationState fsmState,
+    ErrorCode errorCode
 ) {
     if (!mqttClient.connected()) {
         connectMQTT();
@@ -46,7 +47,7 @@ void MQTTManager::update(
     mqttClient.loop();
 
     if (fsmState != lastFSMState) {
-        publishFSMState(fsmState);
+        publishFSMState(fsmState, errorCode);
         publishRelayStatus();
         lastFSMState = fsmState;
     }
@@ -89,19 +90,28 @@ void MQTTManager::publishSensors(const SensorData& data) {
 // =========================================
 // publishFSMState()
 // =========================================
-void MQTTManager::publishFSMState(FertigationState state) {
+void MQTTManager::publishFSMState(FertigationState state, ErrorCode errorCode) {
     JsonDocument doc;
     doc["device_id"] = MQTT_CLIENT_ID;
     doc["state"]     = stateToString(state);
     doc["timestamp"] = millis();
 
-    char buf[128];
+    if (errorCode != ErrorCode::NONE) {
+        doc["error_code"] = errorCodeToString(errorCode);
+    }
+
+    char buf[160];
     serializeJson(doc, buf);
 
     mqttClient.publish(TOPIC_FSM_STATE, buf, true);
 
     Serial.print("[MQTT] FSM state: ");
-    Serial.println(stateToString(state));
+    Serial.print(stateToString(state));
+    if (errorCode != ErrorCode::NONE) {
+        Serial.print(" | error: ");
+        Serial.print(errorCodeToString(errorCode));
+    }
+    Serial.println();
 }
 
 // =========================================
@@ -385,5 +395,26 @@ const char* MQTTManager::stateToString(FertigationState state) {
         case FertigationState::IRRIGATION:              return "IRRIGATION";
         case FertigationState::ERROR:                   return "ERROR";
         default:                                        return "UNKNOWN";
+    }
+}
+
+// =========================================
+// errorCodeToString()
+// =========================================
+const char* MQTTManager::errorCodeToString(ErrorCode error) {
+    switch (error) {
+        case ErrorCode::NONE:                return "NONE";
+        case ErrorCode::WATER_TIMEOUT:       return "WATER_TIMEOUT";
+        case ErrorCode::NUTRIENT_A_TIMEOUT:  return "NUTRIENT_A_TIMEOUT";
+        case ErrorCode::NUTRIENT_B_TIMEOUT:  return "NUTRIENT_B_TIMEOUT";
+        case ErrorCode::MIXER_DRY_RUN:       return "MIXER_DRY_RUN";
+        case ErrorCode::RTC_FAILURE:         return "RTC_FAILURE";
+        case ErrorCode::PH_SENSOR_FAILURE:   return "PH_SENSOR_FAILURE";
+        case ErrorCode::TDS_SENSOR_FAILURE:  return "TDS_SENSOR_FAILURE";
+        case ErrorCode::ULTRASONIC_FAILURE:  return "ULTRASONIC_FAILURE";
+        case ErrorCode::OVER_PPM:            return "OVER_PPM";
+        case ErrorCode::PH_OUT_OF_RANGE:     return "PH_OUT_OF_RANGE";
+        case ErrorCode::CORRECTION_FAILED:   return "CORRECTION_FAILED";
+        default:                             return "UNKNOWN_ERROR";
     }
 }

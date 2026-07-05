@@ -35,6 +35,7 @@ public:
     void update();
 
     FertigationState getState() const;
+    ErrorCode        getError() const;
 
 private:
     void changeState(

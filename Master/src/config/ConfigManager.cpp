@@ -28,36 +28,28 @@ void ConfigManager::begin() {
 // applyDefaults() — nilai fallback
 // =========================================
 void ConfigManager::applyDefaults() {
-    _ppmTolerance     = 50.0f;
-    _initialNutrientA = 0.8f;
-    _initialNutrientB = 0.8f;
+    _ppmTolerance     = 0.0f;
+    _initialNutrientA = 0.0f;
+    _initialNutrientB = 0.0f;
 
-    _defaultMinPH = 5.5f;
-    _defaultMaxPH = 6.5f;
+    _defaultMinPH = 0.0f;
+    _defaultMaxPH = 0.0f;
 
-    _numRecipeStages = 3;
-    _recipeStages[0] = {10, 800.0f,  5.5f, 6.5f};
-    _recipeStages[1] = {20, 1000.0f, 5.5f, 6.5f};
-    _recipeStages[2] = {70, 1200.0f, 5.5f, 6.5f};
+    _numRecipeStages = 0;
+    memset(_recipeStages, 0, sizeof(_recipeStages));
 
-    _numIrrigationStages = 7;
-    _irrigationStages[0] = {7,  3900, 3650};
-    _irrigationStages[1] = {13, 3850, 3600};
-    _irrigationStages[2] = {27, 3800, 3600};
-    _irrigationStages[3] = {29, 3800, 3580};
-    _irrigationStages[4] = {48, 3800, 3580};
-    _irrigationStages[5] = {58, 3850, 3600};
-    _irrigationStages[6] = {70, 3900, 3650};
+    _numIrrigationStages = 0;
+    memset(_irrigationStages, 0, sizeof(_irrigationStages));
 
-    _totalPlants            = 80;
-    _maxConsumptionPerPlant = 15.0f;
-    _dailyTargetVolume      = 1.0f;
-    _tankCapacityLiter      = 15.0f;
+    _totalPlants            = 0;
+    _maxConsumptionPerPlant = 0.0f;
+    _dailyTargetVolume      = 0.0f;
+    _tankCapacityLiter      = 0.0f;
 
-    _plantYear      = 2026;
-    _plantMonth     = 6;
-    _plantDay       = 1;
-    _dailyMixHour   = 5;
+    _plantYear      = 0;
+    _plantMonth     = 0;
+    _plantDay       = 0;
+    _dailyMixHour   = 0;
     _dailyMixMinute = 0;
 
     _configured = false;
@@ -177,6 +169,28 @@ void ConfigManager::saveAll() {
     _prefs.end();
 
     _configured = true;
+}
+
+// =========================================
+// clearConfig() — menghapus semua konfigurasi
+// =========================================
+void ConfigManager::clearConfig() {
+    applyDefaults();
+
+    // Hapus data di NVS
+    _prefs.begin(NS_META, false);
+    _prefs.putBool("configured", false);
+    _prefs.end();
+
+    _prefs.begin(NS_PPM, false);   _prefs.clear(); _prefs.end();
+    _prefs.begin(NS_PH, false);    _prefs.clear(); _prefs.end();
+    _prefs.begin(NS_REC, false);   _prefs.clear(); _prefs.end();
+    _prefs.begin(NS_IRR, false);   _prefs.clear(); _prefs.end();
+    _prefs.begin(NS_SYS, false);   _prefs.clear(); _prefs.end();
+    _prefs.begin(NS_SCHED, false); _prefs.clear(); _prefs.end();
+
+    _configured = false;
+    Serial.println("[CFG] Configuration cleared/wiped.");
 }
 
 // =========================================

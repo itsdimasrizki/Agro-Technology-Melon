@@ -79,6 +79,9 @@ public:
     // True jika minimal satu konfigurasi pernah diterima dari MQTT
     bool isConfigured() const { return _configured; }
 
+    // Hapus konfigurasi dan set ke default kosong
+    void clearConfig();
+
 private:
     void applyDefaults();
     void loadFromNVS();

@@ -66,11 +66,16 @@ void FertigationFSM::begin() {
         return;
     }
 
+    if (!configManager.isConfigured()) {
+        logStateAction("[FSM] Belum ada konfigurasi dari web — menunggu di IDLE");
+        changeState(FertigationState::IDLE);
+    } else {
 #if SKIP_DAILY_SCHEDULE
-    changeState(FertigationState::PREPARE_DAILY_MIX);
+        changeState(FertigationState::PREPARE_DAILY_MIX);
 #else
-    changeState(FertigationState::WAIT_DAILY_MIX);
+        changeState(FertigationState::WAIT_DAILY_MIX);
 #endif
+    }
 }
 
 //! Update
@@ -78,6 +83,19 @@ void FertigationFSM::update() {
     rtcManager.refresh();
     sensorManager.update();
     sensor = sensorManager.getData();
+
+    if (configManager.isConfigured()) {
+        uint8_t numStages = configManager.getNumRecipeStages();
+        if (numStages > 0) {
+            uint16_t maxAge = configManager.getRecipeStage(numStages - 1).maxAgeDays;
+            uint16_t age = rtcManager.getPlantAgeDays();
+            if (age > maxAge) {
+                logStateAction("[FSM] Umur tanaman melebihi batas resep maksimal — reset konfigurasi");
+                configManager.clearConfig();
+                changeState(FertigationState::IDLE);
+            }
+        }
+    }
 
     switch (state) {
         case FertigationState::IDLE:
@@ -447,6 +465,15 @@ void FertigationFSM::recoverFromError() {
 //! STATE HANDLERS
 void FertigationFSM::handleIdle() {
     relayManager.allOff();
+
+    if (configManager.isConfigured()) {
+        logStateAction("[FSM] Konfigurasi terdeteksi — memulai penjadwalan fertigasi");
+#if SKIP_DAILY_SCHEDULE
+        changeState(FertigationState::PREPARE_DAILY_MIX);
+#else
+        changeState(FertigationState::WAIT_DAILY_MIX);
+#endif
+    }
 }
 
 void FertigationFSM::handleWaitDailyMix() {

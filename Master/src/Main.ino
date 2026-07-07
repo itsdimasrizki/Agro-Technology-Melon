@@ -1,5 +1,7 @@
 #include <Wire.h>
 
+#include <WiFi.h>
+
 #include "config/PinConfig.h"
 #include "config/ConfigManager.h"
 
@@ -178,6 +180,9 @@ void loop() {
         lastPrint = millis();
 
         SensorData data = sensorManager.getData();
+
+        Serial.print("Alamat MAC ESP32-S3: ");
+        Serial.println(WiFi.macAddress());
 
         Serial.print("Temp : ");
         Serial.println(data.temperature);

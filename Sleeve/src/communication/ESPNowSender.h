@@ -7,7 +7,8 @@
 #include "../communication/SoilData.h"
 
 static const uint8_t MASTER_MAC[6] = {
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF   // <Konfigurasi : Ubah dengan MAC Address asli dari ESP32 Master>
+    0xAC, 0xA7, 0x04, 0x13, 0x6E, 0x8C   // <Konfigurasi : Ubah dengan MAC Address asli dari ESP32 Master>
+// AC:A7:04:13:6E:8C
 };
 
 class ESPNowSender {

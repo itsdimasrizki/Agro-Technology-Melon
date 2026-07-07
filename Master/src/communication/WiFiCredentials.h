@@ -1,7 +1,7 @@
 #ifndef WIFI_CREDENTIALS_H
 #define WIFI_CREDENTIALS_H
 
-#define WIFI_SSID     "SSID_WIFI_KAMU"
-#define WIFI_PASSWORD "PASSWORD_WIFI_KAMU"
+#define WIFI_SSID     "SSID"
+#define WIFI_PASSWORD "PASSWORD"
 
 #endif

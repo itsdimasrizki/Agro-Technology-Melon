@@ -105,48 +105,64 @@ void IRAM_ATTR flowBISR() {
 
 void setup() {
     Serial.begin(115200);
+    // Tunggu USB CDC siap (wajib untuk ESP32-S3 USB CDC)
+    unsigned long t = millis();
+    while (!Serial && (millis() - t) < 3000) delay(10);
+    Serial.println("[BOOT] Serial ready");
 
     // 1. Inisialisasi ConfigManager
+    Serial.println("[1] ConfigManager...");
     configManager.begin();
 
+    Serial.println("[2] Relay...");
     relay.begin();
 
+    Serial.println("[3] FlowMeters...");
     flowWater.begin(flowWaterISR);
     flowA.begin(flowAISR);
     flowB.begin(flowBISR);
 
+    Serial.println("[4] Wire I2C...");
     Wire.begin(
         I2C_SDA_PIN,
         I2C_SCL_PIN
     );
 
+    Serial.println("[5] WaterLevel...");
     waterLevel.begin();
-    // Propagate config ke WaterLevel
     waterLevel.setTankCapacity(configManager.getTankCapacityLiter());
 
+    Serial.println("[6] WaterTemp...");
     waterTemp.begin();
     
+    Serial.println("[7] RTC...");
     rtcManager.begin();
-    // Propagate config ke RTCManager
     rtcManager.setPlantingDate(configManager.getPlantYear(), configManager.getPlantMonth(), configManager.getPlantDay());
     rtcManager.setDailyMixSchedule(configManager.getDailyMixHour(), configManager.getDailyMixMinute());
 
+    Serial.println("[8] Recovery...");
     recovery.begin();
 
     // recovery.clear();
 
+    Serial.println("[9] PH & TDS Sensor...");
     phSensor.begin();
     tdsSensor.begin();
 
+    Serial.println("[10] ESP-NOW...");
     if(!espNow.begin()) {
-        Serial.println("ESP-NOW Error");
+        Serial.println("  -> ESP-NOW Error!");
+    } else {
+        Serial.println("  -> ESP-NOW OK");
     }
 
+    Serial.println("[11] FSM...");
     fsm.begin();
 
+    Serial.println("[12] MQTT...");
     mqtt.begin();
 
-    Serial.println("System Ready");
+    Serial.println("=== System Ready ===");
     delay(5000);
 }
 

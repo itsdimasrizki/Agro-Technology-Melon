@@ -23,4 +23,10 @@ constexpr unsigned long CORRECTION_MIX_TIME = 60000UL;  // 1 menit
 constexpr uint32_t      PRE_IRRIGATION_MIX_TIME = 60000UL; // 1 menit
 constexpr uint32_t      CORRECTION_DELAY    = 180000UL; // 3 menit
 
+// --- Pengisian air manual (FILL_WATER) ---
+// Toleransi noise sensor ultrasonik — perubahan di bawah nilai ini dianggap noise, bukan gerakan level nyata
+constexpr float          WATER_LEVEL_NOISE_THRESHOLD  = 0.1f;     // liter
+// Durasi level harus stabil (tidak berubah) setelah buzzer ON sebelum FSM lanjut ke PRE_MIX_A
+constexpr unsigned long  WATER_LEVEL_STABLE_TIMEOUT   = 60000UL;  // 1 menit
+
 #endif

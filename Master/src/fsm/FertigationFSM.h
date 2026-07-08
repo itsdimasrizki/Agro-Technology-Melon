@@ -52,8 +52,14 @@ private:
     void startMixer();
     void stopMixer();
 
-    void startWaterFilling();
-    void stopWaterFilling();
+    void startBuzzer();
+    void stopBuzzer();
+    void startFillStirrer();
+    void stopFillStirrer();
+
+    // Warning non-fatal (set currentError TANPA masuk state ERROR)
+    void setWarning(ErrorCode error);
+    void clearWarning();
 
     void preMixNutrientA();
     void stopPreMixNutrientA();
@@ -189,6 +195,10 @@ private:
     // (VALIDATE atau PRE_IRRIGATION_VALIDATE)
     // Digunakan oleh gotoPostCorrection() untuk kembali ke validate yang benar
     FertigationState correctionOrigin = FertigationState::VALIDATE;
+
+    // State variables untuk deteksi level stabil pada pengisian air manual (FILL_WATER)
+    float         lastTankVolume      = -1.0f;
+    unsigned long lastLevelChangeTime = 0;
 };
 
 #endif

@@ -415,6 +415,7 @@ const char* MQTTManager::errorCodeToString(ErrorCode error) {
         case ErrorCode::OVER_PPM:            return "OVER_PPM";
         case ErrorCode::PH_OUT_OF_RANGE:     return "PH_OUT_OF_RANGE";
         case ErrorCode::CORRECTION_FAILED:   return "CORRECTION_FAILED";
+        case ErrorCode::WATER_OVERFLOW:      return "WATER_OVERFLOW";
         default:                             return "UNKNOWN_ERROR";
     }
 }

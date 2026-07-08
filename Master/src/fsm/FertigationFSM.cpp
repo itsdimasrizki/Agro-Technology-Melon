@@ -235,14 +235,28 @@ void FertigationFSM::stopMixer() {
     relayManager.off(RELAY_PUMP_MIX);
 }
 
-void FertigationFSM::startWaterFilling() {
-    relayManager.on(RELAY_PUMP_WATER);
-    relayManager.on(RELAY_SOLENOID_WATER);
+void FertigationFSM::startBuzzer() {
+    relayManager.on(RELAY_BUZZER);
 }
 
-void FertigationFSM::stopWaterFilling() {
-    relayManager.off(RELAY_PUMP_WATER);
-    relayManager.off(RELAY_SOLENOID_WATER);
+void FertigationFSM::stopBuzzer() {
+    relayManager.off(RELAY_BUZZER);
+}
+
+void FertigationFSM::startFillStirrer() {
+    relayManager.on(RELAY_MIXER_STIR);
+}
+
+void FertigationFSM::stopFillStirrer() {
+    relayManager.off(RELAY_MIXER_STIR);
+}
+
+void FertigationFSM::setWarning(ErrorCode error) {
+    currentError = error;
+}
+
+void FertigationFSM::clearWarning() {
+    currentError = ErrorCode::NONE;
 }
 
 void FertigationFSM::preMixNutrientA() {
@@ -514,15 +528,36 @@ void FertigationFSM::handleFillWater() {
 
     if (!stateInitialized) {
         consumeRecovery();
+        lastTankVolume    = sensor.tankVolume;
+        lastLevelChangeTime = millis();
+        startFillStirrer();
         stateInitialized = true;
-        logStateAction("[FSM] Filling Water...");
+        logStateAction("[FSM] Menunggu pengisian air manual...");
     }
 
-    if (sensor.flowWater < targetWaterVolume) {
-        startWaterFilling();
+    // Deteksi perubahan level yang nyata (di atas threshold noise ultrasonik)
+    if (fabs(sensor.tankVolume - lastTankVolume) > WATER_LEVEL_NOISE_THRESHOLD) {
+        lastTankVolume      = sensor.tankVolume;
+        lastLevelChangeTime = millis();
+    }
+
+    // Overflow: warning non-fatal — FSM tetap jalan, tidak masuk ERROR
+    if (sensor.tankVolume > configManager.getTankCapacityLiter()) {
+        setWarning(ErrorCode::WATER_OVERFLOW);
+    } else if (currentError == ErrorCode::WATER_OVERFLOW) {
+        clearWarning();
+    }
+
+    // Buzzer ON saat target tercapai; mati sendiri setelah level stabil >= WATER_LEVEL_STABLE_TIMEOUT
+    if (sensor.tankVolume >= configManager.getDailyTargetVolume()) {
+        startBuzzer();
+        if (millis() - lastLevelChangeTime >= WATER_LEVEL_STABLE_TIMEOUT) {
+            stopBuzzer();
+            stopFillStirrer();
+            changeState(FertigationState::PRE_MIX_A);
+        }
     } else {
-        stopWaterFilling();
-        changeState(FertigationState::PRE_MIX_A);
+        stopBuzzer();
     }
 }
 
@@ -910,7 +945,10 @@ void FertigationFSM::logRecovery(
 //      |
 //      v
 // FILL_WATER
-//      | flowWater >= targetWaterVolume
+//      | sensor.tankVolume >= configManager.getDailyTargetVolume()
+//      |   → buzzer ON
+//      |   → level stabil (tidak berubah >= WATER_LEVEL_STABLE_TIMEOUT)
+//      |   → buzzer OFF, stirrer OFF
 //      v
 // PRE_MIX_A
 //      |

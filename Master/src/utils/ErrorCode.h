@@ -19,7 +19,9 @@ enum class ErrorCode {
 
     PH_OUT_OF_RANGE,
 
-    CORRECTION_FAILED
+    CORRECTION_FAILED,
+
+    WATER_OVERFLOW           // overflow warning (non-fatal: FSM tetap jalan, auto-clear saat volume turun)
 };
 
 #endif

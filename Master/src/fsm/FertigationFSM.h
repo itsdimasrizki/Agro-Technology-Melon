@@ -14,20 +14,23 @@
 #include "../config/ConfigManager.h"
 
 #include "../utils/ErrorCode.h"
+#include "SoilHealthMonitor.h"
 
 class FertigationFSM {
 public:
     FertigationFSM(
-        SensorManager& sensors,
-        RelayManager& relays,
-        RTCManager& rtc,
-        RecipeManager& recipe,
-        IrrigationRecipe& irrigation,
-        FlowMeter& water,
-        FlowMeter& a,
-        FlowMeter& b,
-        RecoveryManager& recovery,
-        ConfigManager& config
+        SensorManager&     sensors,
+        RelayManager&      relays,
+        RTCManager&        rtc,
+        RecipeManager&     recipe,
+        IrrigationRecipe&  irrigation,
+        FlowMeter&         water,
+        FlowMeter&         a,
+        FlowMeter&         b,
+        FlowMeter&         irrig,          // flow sensor irigasi (Timer mode)
+        RecoveryManager&   recovery,
+        ConfigManager&     config,
+        SoilHealthMonitor& soilHealth      // monitor kesehatan sensor kelembapan
     );
 
     void begin();
@@ -131,6 +134,9 @@ private:
     void handleIrrigation();
     void handleError();
 
+    // Timer Fallback Irrigation — dipanggil dari handleReady() saat mode TIMER
+    void handleTimerIrrigation();
+
     // --- Log helpers ---
     void logStateTransition(FertigationState newState);
     void logStateAction(const char* message);
@@ -170,9 +176,12 @@ private:
     FlowMeter& waterFlow;
     FlowMeter& nutrientAFlow;
     FlowMeter& nutrientBFlow;
+    FlowMeter& irrigFlow;        // flow sensor irigasi untuk Timer mode
 
-    NutrientRecipe currentRecipe;
+    NutrientRecipe   currentRecipe;
     IrrigationConfig currentIrrigation;
+
+    SoilHealthMonitor& soilHealthMonitor;
 
     // FIX: uint16_t agar tidak overflow setelah hari ke-255
     uint16_t lastMixDay;
@@ -199,6 +208,16 @@ private:
     // State variables untuk deteksi level stabil pada pengisian air manual (FILL_WATER)
     float         lastTankVolume      = -1.0f;
     unsigned long lastLevelChangeTime = 0;
+
+    // --- Timer Fallback Irrigation state ---
+    // Flag: set true pada frame pertama setelah IRRIGATION selesai
+    bool _irrigJustCompleted = false;
+
+    // Tracking slot jadwal yang sedang aktif
+    int8_t        _activeSlotIdx     = -1;   // -1 = tidak ada slot aktif
+    bool          _timerSlotRunning  = false; // apakah sedang dalam sesi irigasi timer
+    float         _timerTargetML     = 0.0f;  // target volume untuk slot ini (mL)
+    unsigned long _lastSlotMinute    = 0xFFFF; // menit terakhir slot yang dipicu (cegah double-trigger)
 };
 
 #endif

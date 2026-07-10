@@ -13,6 +13,7 @@
 #include "../rtc/RTCManager.h"
 #include "../sensors/WaterLevel.h"
 #include "../utils/ErrorCode.h"
+#include "../fsm/SoilHealthMonitor.h"
 
 // =========================================
 // WIFI & MQTT — isi sesuai environment kamu
@@ -43,6 +44,13 @@
 #define TOPIC_CFG_IRRIG     "greenhouse/config/irrigation"
 #define TOPIC_CFG_SYSTEM    "greenhouse/config/system"
 #define TOPIC_CFG_SCHEDULE  "greenhouse/config/schedule"
+#define TOPIC_CFG_TIMER_IRRIG "greenhouse/config/timer_irrigation"
+#define TOPIC_CMD_SOIL_RESET  "greenhouse/soil/reset_mode"
+
+// =========================================
+// MQTT TOPICS — Telemetry (publish)
+// =========================================
+#define TOPIC_SOIL_HEALTH   "greenhouse/soil/health"
 
 // Interval publish sensor (ms)
 #define MQTT_PUBLISH_INTERVAL 5000UL
@@ -50,7 +58,7 @@
 class MQTTManager {
 public:
     MQTTManager(RelayManager& relay, ConfigManager& config,
-                RTCManager& rtc, WaterLevel& waterLevel);
+                RTCManager& rtc, WaterLevel& waterLevel, SoilHealthMonitor& soilHealth);
 
     // Panggil di setup()
     void begin();
@@ -63,6 +71,9 @@ public:
 
     // Publish status relay saat ada perubahan
     void publishRelayStatus();
+
+    // Publish status kesehatan sensor tanah + mode irigasi
+    void publishSoilHealth();
 
     // Cek apakah ada command masuk dari dashboard
     bool hasCommand() const;
@@ -89,6 +100,8 @@ private:
     void handleConfigIrrigation(const JsonDocument& doc);
     void handleConfigSystem(const JsonDocument& doc);
     void handleConfigSchedule(const JsonDocument& doc);
+    void handleConfigTimerIrrigation(const JsonDocument& doc);
+    void handleSoilResetMode(const String& payload);
 
     // Static callback PubSubClient — gunakan pointer ke instance
     static void onMessage(const char* topic, byte* payload, unsigned int length);
@@ -103,9 +116,12 @@ private:
     ConfigManager&   configManager;
     RTCManager&      rtcManager;
     WaterLevel&      waterLevel;
+    SoilHealthMonitor& soilHealth;
 
     unsigned long lastPublish = 0;
+    unsigned long lastSoilPublish = 0;
     FertigationState lastFSMState = FertigationState::IDLE;
+    IrrigationMode lastIrrigMode = IrrigationMode::HUMIDITY;
 
     // Helper: konversi enum ke string
     const char* stateToString(FertigationState state);

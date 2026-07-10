@@ -13,6 +13,7 @@
 #define FLOW_WATER_PIN      9
 #define FLOW_A_PIN          10
 #define FLOW_B_PIN          11
+#define FLOW_IRRIG_PIN      7   // Flow sensor irigasi — dipakai saat mode TIMER Fallback
 
 // I2C (RTC PCF8563)
 #define I2C_SDA_PIN         14

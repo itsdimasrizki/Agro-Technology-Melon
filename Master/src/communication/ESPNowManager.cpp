@@ -2,8 +2,8 @@
 
 SoilData ESPNowManager::receivedData;
 
-volatile bool
-ESPNowManager::newData = false;
+volatile bool         ESPNowManager::newData        = false;
+volatile unsigned long ESPNowManager::_lastReceiveMs = 0;
 
 bool ESPNowManager::begin() {
     WiFi.mode(WIFI_STA);
@@ -30,6 +30,7 @@ void ESPNowManager::onDataRecv(
         sizeof(receivedData)
     );
 
+    _lastReceiveMs = millis();
     newData = true;
 }
 
@@ -45,4 +46,8 @@ const {
 
 void ESPNowManager::clearFlag() {
     newData = false;
+}
+
+unsigned long ESPNowManager::getLastReceiveTime() const {
+    return _lastReceiveMs;
 }

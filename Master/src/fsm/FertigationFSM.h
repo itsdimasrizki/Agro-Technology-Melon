@@ -24,7 +24,6 @@ public:
         RTCManager&        rtc,
         RecipeManager&     recipe,
         IrrigationRecipe&  irrigation,
-        FlowMeter&         water,
         FlowMeter&         a,
         FlowMeter&         b,
         FlowMeter&         irrig,          // flow sensor irigasi (Timer mode)
@@ -173,7 +172,6 @@ private:
     RecoveryManager& recovery;
     ConfigManager& configManager;
 
-    FlowMeter& waterFlow;
     FlowMeter& nutrientAFlow;
     FlowMeter& nutrientBFlow;
     FlowMeter& irrigFlow;        // flow sensor irigasi untuk Timer mode

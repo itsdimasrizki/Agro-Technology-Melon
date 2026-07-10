@@ -6,7 +6,6 @@ SensorManager::SensorManager(
     TDSSensor& tds,
     WaterLevel& level,
     ESPNowManager& esp,
-    FlowMeter& water,
     FlowMeter& a,
     FlowMeter& b
 )
@@ -16,7 +15,6 @@ phSensor(ph),
 tdsSensor(tds),
 levelSensor(level),
 espNow(esp),
-flowWater(water),
 flowA(a),
 flowB(b),
 data{}
@@ -83,7 +81,7 @@ void SensorManager::update() {
         _lastLevelUpdate = now;
     }
 
-    data.flowWater = flowWater.getVolumeLiter();
+    data.flowWater = 0.0f; // flowWater pin removed on current PCB
     data.flowA     = flowA.getVolumeLiter();
     data.flowB     = flowB.getVolumeLiter();
 

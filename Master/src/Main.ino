@@ -33,7 +33,6 @@ RelayManager relay;
 
 // FLOW METERS
 // Gunakan PinConfig.h pins
-FlowMeter flowWater(FLOW_WATER_PIN);
 FlowMeter flowA(FLOW_A_PIN);
 FlowMeter flowB(FLOW_B_PIN);
 FlowMeter flowIrrig(FLOW_IRRIG_PIN); // Flow sensor irigasi (Timer mode)
@@ -73,7 +72,6 @@ SensorManager sensorManager(
     tdsSensor,
     waterLevel,
     espNow,
-    flowWater,
     flowA,
     flowB
 );
@@ -89,7 +87,6 @@ FertigationFSM fsm(
     rtcManager,
     recipeManager,
     irrigationRecipe,
-    flowWater,
     flowA,
     flowB,
     flowIrrig,
@@ -99,9 +96,6 @@ FertigationFSM fsm(
 );
 
 // ISR
-void IRAM_ATTR flowWaterISR() {
-    flowWater.pulseCount++;
-}
 
 void IRAM_ATTR flowAISR() {
     flowA.pulseCount++;
@@ -130,7 +124,6 @@ void setup() {
     relay.begin();
 
     Serial.println("[3] FlowMeters...");
-    flowWater.begin(flowWaterISR);
     flowA.begin(flowAISR);
     flowB.begin(flowBISR);
     flowIrrig.begin(flowIrrigISR);

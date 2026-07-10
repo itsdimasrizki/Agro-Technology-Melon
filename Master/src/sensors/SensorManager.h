@@ -32,7 +32,6 @@ public:
         TDSSensor& tds,
         WaterLevel& level,
         ESPNowManager& espNow,
-        FlowMeter& water,
         FlowMeter& a,
         FlowMeter& b
     );
@@ -51,7 +50,6 @@ private:
 
     ESPNowManager& espNow;
 
-    FlowMeter& flowWater;
     FlowMeter& flowA;
     FlowMeter& flowB;
 

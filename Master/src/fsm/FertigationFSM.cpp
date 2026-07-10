@@ -8,7 +8,6 @@ FertigationFSM::FertigationFSM(
     RTCManager&        rtc,
     RecipeManager&     recipe,
     IrrigationRecipe&  irrigation,
-    FlowMeter&         water,
     FlowMeter&         a,
     FlowMeter&         b,
     FlowMeter&         irrig,
@@ -24,7 +23,6 @@ recipeManager(recipe),
 irrigationRecipe(irrigation),
 recovery(recoveryManager),
 configManager(config),
-waterFlow(water),
 nutrientAFlow(a),
 nutrientBFlow(b),
 irrigFlow(irrig),
@@ -399,7 +397,7 @@ void FertigationFSM::saveRecovery() {
     RecoveryData data;
 
     data.state = static_cast<uint16_t>(state);
-    data.waterPulse = waterFlow.pulseCount;
+    data.waterPulse = 0; // Removed flowWater
     data.nutrientAPulse = nutrientAFlow.pulseCount;
     data.nutrientBPulse = nutrientBFlow.pulseCount;
     data.day = lastMixDay;
@@ -446,7 +444,6 @@ void FertigationFSM::restoreRecovery() {
             : static_cast<uint16_t>(FertigationState::IDLE)
     );
 
-    waterFlow.setPulseCount(data.waterPulse);
     nutrientAFlow.setPulseCount(data.nutrientAPulse);
     nutrientBFlow.setPulseCount(data.nutrientBPulse);
 
@@ -523,7 +520,6 @@ void FertigationFSM::handleWaitDailyMix() {
 
 void FertigationFSM::handlePrepareDailyMix() {
     prepareDailyRecipe();
-    waterFlow.reset();
     nutrientAFlow.reset();
     nutrientBFlow.reset();
     clearRecovery();

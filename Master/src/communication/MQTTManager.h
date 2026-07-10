@@ -14,6 +14,7 @@
 #include "../sensors/WaterLevel.h"
 #include "../utils/ErrorCode.h"
 #include "../fsm/SoilHealthMonitor.h"
+#include "../fsm/FertigationFSM.h"
 
 // =========================================
 // WIFI & MQTT — isi sesuai environment kamu
@@ -44,13 +45,15 @@
 #define TOPIC_CFG_IRRIG     "greenhouse/config/irrigation"
 #define TOPIC_CFG_SYSTEM    "greenhouse/config/system"
 #define TOPIC_CFG_SCHEDULE  "greenhouse/config/schedule"
-#define TOPIC_CFG_TIMER_IRRIG "greenhouse/config/timer_irrigation"
-#define TOPIC_CMD_SOIL_RESET  "greenhouse/soil/reset_mode"
+#define TOPIC_CFG_TIMER_IRRIG   "greenhouse/config/timer_irrigation"
+#define TOPIC_CFG_MIX_EXT       "greenhouse/config/mix_schedule_ext"
+#define TOPIC_CMD_SOIL_RESET    "greenhouse/soil/reset_mode"
 
 // =========================================
 // MQTT TOPICS — Telemetry (publish)
 // =========================================
-#define TOPIC_SOIL_HEALTH   "greenhouse/soil/health"
+#define TOPIC_SOIL_HEALTH       "greenhouse/soil/health"
+#define TOPIC_ALERT_TANK_LOW    "greenhouse/alert/tank_low"
 
 // Interval publish sensor (ms)
 #define MQTT_PUBLISH_INTERVAL 5000UL
@@ -58,7 +61,8 @@
 class MQTTManager {
 public:
     MQTTManager(RelayManager& relay, ConfigManager& config,
-                RTCManager& rtc, WaterLevel& waterLevel, SoilHealthMonitor& soilHealth);
+                RTCManager& rtc, WaterLevel& waterLevel,
+                SoilHealthMonitor& soilHealth, FertigationFSM& fsm);
 
     // Panggil di setup()
     void begin();
@@ -74,6 +78,9 @@ public:
 
     // Publish status kesehatan sensor tanah + mode irigasi
     void publishSoilHealth();
+
+    // Publish alert tank low (dipanggil dari update() saat FSM set flag)
+    void publishTankLowAlert(float deficitLiter);
 
     // Cek apakah ada command masuk dari dashboard
     bool hasCommand() const;
@@ -101,6 +108,7 @@ private:
     void handleConfigSystem(const JsonDocument& doc);
     void handleConfigSchedule(const JsonDocument& doc);
     void handleConfigTimerIrrigation(const JsonDocument& doc);
+    void handleConfigMixScheduleExt(const JsonDocument& doc);
     void handleSoilResetMode(const String& payload);
 
     // Static callback PubSubClient — gunakan pointer ke instance
@@ -117,6 +125,7 @@ private:
     RTCManager&      rtcManager;
     WaterLevel&      waterLevel;
     SoilHealthMonitor& soilHealth;
+    FertigationFSM&  fsm;  // untuk polling tank-low alert
 
     unsigned long lastPublish = 0;
     unsigned long lastSoilPublish = 0;

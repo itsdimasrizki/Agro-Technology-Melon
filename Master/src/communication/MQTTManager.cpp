@@ -9,13 +9,15 @@ MQTTManager* MQTTManager::_instance      = nullptr;
 // Constructor
 // =========================================
 MQTTManager::MQTTManager(RelayManager& relay, ConfigManager& config,
-                         RTCManager& rtc, WaterLevel& wl, SoilHealthMonitor& sh)
+                         RTCManager& rtc, WaterLevel& wl,
+                         SoilHealthMonitor& sh, FertigationFSM& f)
     : mqttClient(wifiClient),
       relayManager(relay),
       configManager(config),
       rtcManager(rtc),
       waterLevel(wl),
-      soilHealth(sh)
+      soilHealth(sh),
+      fsm(f)
 {
     _instance = this;
 }
@@ -57,6 +59,12 @@ void MQTTManager::update(
     if (currentIrrigMode != lastIrrigMode) {
         publishSoilHealth();
         lastIrrigMode = currentIrrigMode;
+    }
+
+    // Polling tank-low alert dari FSM (flag + getter pattern, tanpa coupling balik)
+    if (fsm.isTankLowAlertPending()) {
+        publishTankLowAlert(fsm.getTankLowDeficit());
+        fsm.clearTankLowAlert();
     }
 
     unsigned long now = millis();
@@ -236,6 +244,7 @@ void MQTTManager::handleMessage(const char* topic, const String& payload) {
     else if (t == TOPIC_CFG_SYSTEM)   handleConfigSystem(doc);
     else if (t == TOPIC_CFG_SCHEDULE) handleConfigSchedule(doc);
     else if (t == TOPIC_CFG_TIMER_IRRIG) handleConfigTimerIrrigation(doc);
+    else if (t == TOPIC_CFG_MIX_EXT)  handleConfigMixScheduleExt(doc);
 }
 
 // =========================================
@@ -384,9 +393,10 @@ void MQTTManager::connectMQTT() {
         mqttClient.subscribe(TOPIC_CFG_SYSTEM);
         mqttClient.subscribe(TOPIC_CFG_SCHEDULE);
         mqttClient.subscribe(TOPIC_CFG_TIMER_IRRIG);
+        mqttClient.subscribe(TOPIC_CFG_MIX_EXT);
         mqttClient.subscribe(TOPIC_CMD_SOIL_RESET);
 
-        Serial.println("[MQTT] Subscribed to all topics including Soil Health and Timer Fallback");
+        Serial.println("[MQTT] Subscribed to all topics");
     } else {
         Serial.print(" failed, rc=");
         Serial.println(mqttClient.state());
@@ -436,6 +446,8 @@ const char* MQTTManager::errorCodeToString(ErrorCode error) {
         case ErrorCode::PH_OUT_OF_RANGE:     return "PH_OUT_OF_RANGE";
         case ErrorCode::CORRECTION_FAILED:   return "CORRECTION_FAILED";
         case ErrorCode::WATER_OVERFLOW:      return "WATER_OVERFLOW";
+        case ErrorCode::RECIPE_PH_CONFLICT:  return "RECIPE_PH_CONFLICT";
+        case ErrorCode::TANK_LOW:            return "TANK_LOW";
         default:                             return "UNKNOWN_ERROR";
     }
 }
@@ -467,11 +479,51 @@ void MQTTManager::handleConfigTimerIrrigation(const JsonDocument& doc) {
 }
 
 // =========================================
+// handleConfigMixScheduleExt()
+// Topic: greenhouse/config/mix_schedule_ext
+// Payload contoh:
+// {
+//   "mix_interval_days":    3,
+//   "per_plant_need_liter": 0.5,
+//   "stir_evening_hour":    18,
+//   "stir_evening_minute":  0,
+//   "stir_duration_seconds": 300
+// }
+// =========================================
+void MQTTManager::handleConfigMixScheduleExt(const JsonDocument& doc) {
+    uint16_t intervalDays = doc["mix_interval_days"]    | configManager.getMixIntervalDays();
+    float    perPlant     = doc["per_plant_need_liter"] | configManager.getPerPlantNeedLiter();
+    uint8_t  stirEvHour   = doc["stir_evening_hour"]    | configManager.getStirEveningHour();
+    uint8_t  stirEvMin    = doc["stir_evening_minute"]  | configManager.getStirEveningMinute();
+    uint32_t stirDurSec   = doc["stir_duration_seconds"]| (uint32_t)(configManager.getStirDurationMs() / 1000UL);
+
+    configManager.setMixScheduleExt(intervalDays, perPlant, stirEvHour, stirEvMin,
+                                    stirDurSec * 1000UL);
+    publishConfigAck("mix_schedule_ext", true);
+}
+
+// =========================================
 // handleSoilResetMode()
 // =========================================
 void MQTTManager::handleSoilResetMode(const String& payload) {
     soilHealth.resetToHumidityMode();
     publishSoilHealth();
+}
+
+// =========================================
+// publishTankLowAlert()
+// =========================================
+void MQTTManager::publishTankLowAlert(float deficitLiter) {
+    JsonDocument doc;
+    doc["device_id"]     = MQTT_CLIENT_ID;
+    doc["deficit_liter"] = round(deficitLiter * 100.0f) / 100.0f;
+    doc["timestamp"]     = millis();
+
+    char buf[128];
+    serializeJson(doc, buf);
+    mqttClient.publish(TOPIC_ALERT_TANK_LOW, buf, false);
+
+    Serial.printf("[MQTT] Tank LOW alert published: deficit=%.2fL\n", deficitLiter);
 }
 
 // =========================================

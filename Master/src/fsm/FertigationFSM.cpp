@@ -219,15 +219,12 @@ bool FertigationFSM::isPPMInRange() {
     return abs(sensor.ppm - targetPPM) <= configManager.getPPMTolerance();
 }
 
-bool FertigationFSM::isTodayAlreadyMixed() {
+// isMixDue() menggantikan isTodayAlreadyMixed().
+// Logic: selisih hari sejak lastMixDay >= mixIntervalDays.
+// mixIntervalDays=1 (default) → perilaku identik dengan isTodayAlreadyMixed() lama.
+bool FertigationFSM::isMixDue() {
     uint16_t day = rtcManager.getPlantAgeDays();
-    uint8_t month = rtcManager.getMonth();
-    uint16_t year = rtcManager.getYear();
-
-    return
-        day == lastMixDay &&
-        month == lastMixMonth &&
-        year == lastMixYear;
+    return (day - lastMixDay) >= configManager.getMixIntervalDays();
 }
 
 bool FertigationFSM::isStateTimeout(unsigned long timeout) {
@@ -305,37 +302,164 @@ void FertigationFSM::stopNutrientB() {
 
 //! RECIPE
 void FertigationFSM::prepareDailyRecipe() {
-    uint16_t age = rtcManager.getPlantAgeDays();
+    uint16_t age      = rtcManager.getPlantAgeDays();
+    uint16_t interval = configManager.getMixIntervalDays();
 
-    currentRecipe = recipeManager.getRecipe(age);
-    currentIrrigation = irrigationRecipe.getRecipe(age);
+    // Grouping: ambil nilai paling konservatif dari semua hari dalam siklus mixing ini.
+    // - minPPM      : target PPM PALING RENDAH dalam grup (cegah over-dosis di hari mana pun)
+    // - maxOfMinPH  : batas bawah pH PALING TINGGI dalam grup (irisan rentang)
+    // - minOfMaxPH  : batas atas pH PALING RENDAH dalam grup (irisan rentang)
+    float minPPM     = 1.0e9f;
+    float maxOfMinPH = 0.0f;
+    float minOfMaxPH = 14.0f;
 
-    targetPPM = currentRecipe.targetPPM;
-    targetMinPH = currentRecipe.targetMinPH;
-    targetMaxPH = currentRecipe.targetMaxPH;
+    for (uint16_t d = age; d < age + interval; d++) {
+        NutrientRecipe r = recipeManager.getRecipe(d);
+        if (r.targetPPM    < minPPM)     minPPM     = r.targetPPM;
+        if (r.targetMinPH  > maxOfMinPH) maxOfMinPH = r.targetMinPH;
+        if (r.targetMaxPH  < minOfMaxPH) minOfMaxPH = r.targetMaxPH;
+    }
+
+    // Validasi: irisan rentang pH harus valid
+    if (maxOfMinPH > minOfMaxPH) {
+        logError("[FSM] pH resep tidak overlap dalam grup N-hari — batalkan mixing (RECIPE_PH_CONFLICT)");
+        gotoError(ErrorCode::RECIPE_PH_CONFLICT);
+        return;
+    }
+
+    targetPPM    = (uint16_t)minPPM;
+    targetMinPH  = maxOfMinPH;
+    targetMaxPH  = minOfMaxPH;
+
     float remainingVolume = sensor.tankVolume;
-
-    float dailyTargetVol = configManager.getDailyTargetVolume();
+    float dailyTargetVol  = configManager.getDailyTargetVolume();
     targetWaterVolume = dailyTargetVol - remainingVolume;
 
-    if (targetWaterVolume < 0.0f) {
-        targetWaterVolume = 0.0f;
-    }
+    if (targetWaterVolume < 0.0f) targetWaterVolume = 0.0f;
 
     float ratio = targetWaterVolume / dailyTargetVol;
-
-    if (ratio > 1.0f) {
-        ratio = 1.0f;
-    }
-
-    if (ratio < 0.0f) {
-        ratio = 0.0f;
-    }
+    if (ratio > 1.0f) ratio = 1.0f;
+    if (ratio < 0.0f) ratio = 0.0f;
 
     targetNutrientA = configManager.getInitialNutrientA() * ratio;
     targetNutrientB = configManager.getInitialNutrientB() * ratio;
 
+    Serial.printf("[FSM] Recipe group (day %u, interval %u): minPPM=%.0f, pH=[%.1f-%.1f]\n",
+                  age, interval, minPPM, maxOfMinPH, minOfMaxPH);
+
     logRecipe(remainingVolume, ratio);
+}
+
+// =========================================
+// refreshDailyChecks()
+// Dipanggil dari handleWaitDailyMix() setiap tick.
+// Guard internal: hanya eksekusi sekali per hari (berdasarkan plant age).
+// =========================================
+void FertigationFSM::refreshDailyChecks() {
+    uint16_t age = rtcManager.getPlantAgeDays();
+    if (age == _lastDailyCheckDay) return;
+    _lastDailyCheckDay = age;
+
+    // 1. Refresh threshold irigasi harian (independen dari siklus mixing)
+    currentIrrigation = irrigationRecipe.getRecipe(age);
+    Serial.printf("[FSM] Daily refresh: dry=%u, wet=%u\n",
+                  currentIrrigation.dryThreshold, currentIrrigation.wetThreshold);
+
+    // 2. Reset flag stir harian
+    _morningStirDone = false;
+    _eveningStirDone = false;
+
+    // 3. Cek minimum-liter dan trigger stir pagi jika lolos
+    if (checkMinimumWater()) {
+        if (!_morningStirDone && state == FertigationState::WAIT_DAILY_MIX) {
+            startFillStirrer();
+            _stirring        = true;
+            _stirStartMs     = millis();
+            _morningStirDone = true;
+            logStateAction("[FSM] Stir pagi dimulai");
+        }
+    }
+}
+
+// =========================================
+// checkMinimumWater()
+// Hitung minimum volume aman = sisaHari * (perPlantNeedLiter * totalPlants).
+// Blokir irigasi jika tangki di bawah batas, set warning dan pending alert.
+// Return true jika aman, false jika diblokir.
+// =========================================
+bool FertigationFSM::checkMinimumWater() {
+    uint16_t age        = rtcManager.getPlantAgeDays();
+    uint16_t interval   = configManager.getMixIntervalDays();
+    float    perPlant   = configManager.getPerPlantNeedLiter();
+    float    plants     = (float)configManager.getTotalPlants();
+
+    // Hari ke-berapa dalam siklus saat ini (0-based)
+    uint16_t dayInCycle = (age >= lastMixDay) ? (age - lastMixDay) : 0;
+    // Sisa hari yang harus dicukupi oleh sisa tangki (minimum 1)
+    uint16_t sisaHari   = (dayInCycle < interval) ? (interval - dayInCycle) : 1;
+
+    float minimumSafe   = (float)sisaHari * (perPlant * plants);
+
+    // perPlantNeedLiter=0 berarti fitur belum dikonfigurasi — skip guard
+    if (perPlant <= 0.0f || minimumSafe <= 0.0f) {
+        if (_tankLowBlocked) {
+            _tankLowBlocked = false;
+            clearWarning();
+        }
+        return true;
+    }
+
+    if (sensor.tankVolume < minimumSafe) {
+        float deficit = minimumSafe - sensor.tankVolume;
+        if (!_tankLowBlocked) {
+            _tankLowBlocked      = true;
+            _tankLowDeficit      = deficit;
+            _tankLowAlertPending = true;
+            setWarning(ErrorCode::TANK_LOW);
+            Serial.printf("[FSM] Tank LOW: vol=%.1fL < min=%.1fL (deficit=%.1fL)\n",
+                          sensor.tankVolume, minimumSafe, deficit);
+        }
+        return false;
+    }
+
+    // Volume cukup — clear warning jika sebelumnya diblokir
+    if (_tankLowBlocked) {
+        _tankLowBlocked = false;
+        clearWarning();
+        logStateAction("[FSM] Tank volume kembali aman — irigasi diizinkan");
+    }
+    return true;
+}
+
+// =========================================
+// handleStirSchedule()
+// Hentikan stir jika durasi tercapai.
+// Trigger stir sore jika jam/menit sesuai konfigurasi.
+// Hanya jalan saat state READY.
+// =========================================
+void FertigationFSM::handleStirSchedule() {
+    // Hentikan stir yang sedang berjalan jika durasinya sudah habis
+    if (_stirring) {
+        if (millis() - _stirStartMs >= configManager.getStirDurationMs()) {
+            stopFillStirrer();
+            _stirring = false;
+            logStateAction("[FSM] Stir selesai");
+        }
+        return;  // tidak trigger stir baru selagi masih stir
+    }
+
+    // Trigger stir sore
+    uint8_t h = rtcManager.getHour();
+    uint8_t m = rtcManager.getMinute();
+    if (!_eveningStirDone &&
+        h == configManager.getStirEveningHour() &&
+        m == configManager.getStirEveningMinute()) {
+        startFillStirrer();
+        _stirring        = true;
+        _stirStartMs     = millis();
+        _eveningStirDone = true;
+        logStateAction("[FSM] Stir sore dimulai");
+    }
 }
 
 //! MIXING HELPERS
@@ -510,7 +634,12 @@ void FertigationFSM::handleWaitDailyMix() {
     uint8_t month  = rtcManager.getMonth();
     uint16_t year  = rtcManager.getYear();
 
-    if (hour == rtcManager.getDailyMixHour() && minute == rtcManager.getDailyMixMinute() && !isTodayAlreadyMixed()) {
+    // Refresh harian: update threshold irigasi, cek minimum-liter, trigger stir pagi.
+    // refreshDailyChecks() di-guard internal agar hanya jalan sekali per hari.
+    refreshDailyChecks();
+
+    // Trigger mixing hanya jika: jam mixing AND sudah waktunya sesuai interval N-hari
+    if (hour == rtcManager.getDailyMixHour() && minute == rtcManager.getDailyMixMinute() && isMixDue()) {
         lastMixDay   = day;
         lastMixMonth = month;
         lastMixYear  = year;
@@ -810,6 +939,15 @@ void FertigationFSM::handleReady() {
     // Update monitor status
     soilHealthMonitor.update(sensor.soilADC, _irrigJustCompleted, currentIrrigation.wetThreshold);
     _irrigJustCompleted = false;
+
+    // Jalankan stir schedule (pagi sudah dipicu oleh refreshDailyChecks, ini untuk sore + stop timer)
+    handleStirSchedule();
+
+    // Cek minimum-liter dinamis — blokir irigasi jika tangki tidak cukup.
+    // Stir schedule tetap jalan meski irigasi diblokir.
+    if (!checkMinimumWater()) {
+        return;
+    }
 
     // Check mode
     if (soilHealthMonitor.getMode() == IrrigationMode::TIMER) {

@@ -39,6 +39,13 @@ public:
     FertigationState getState() const;
     ErrorCode        getError() const;
 
+    // --- Tank-low alert polling (untuk MQTTManager) ---
+    // Pola: MQTTManager memanggil isTankLowAlertPending() tiap update(),
+    // publish ke MQTT, lalu clearTankLowAlert() agar tidak re-publish.
+    bool  isTankLowAlertPending() const { return _tankLowAlertPending; }
+    float getTankLowDeficit()     const { return _tankLowDeficit; }
+    void  clearTankLowAlert()           { _tankLowAlertPending = false; }
+
 private:
     void changeState(
         FertigationState newState
@@ -47,7 +54,10 @@ private:
     // --- Condition helpers ---
     bool isTankSafeForMixing();
     bool isPPMInRange();
-    bool isTodayAlreadyMixed();
+    // Menggantikan isTodayAlreadyMixed() — cek apakah sudah waktunya mixing
+    // berdasarkan selisih hari (rtcManager.getPlantAgeDays() - lastMixDay) >= mixIntervalDays.
+    // Dengan mixIntervalDays=1 (default), perilaku identik dengan sebelumnya.
+    bool isMixDue();
     bool isStateTimeout(unsigned long timeout);
 
     // --- Actuator helpers ---
@@ -75,6 +85,18 @@ private:
 
     // --- Recipe ---
     void prepareDailyRecipe();
+
+    // Refresh currentIrrigation threshold + minimum-liter check + trigger stir pagi.
+    // Dipanggil sekali per hari dari handleWaitDailyMix().
+    void refreshDailyChecks();
+
+    // Hitung minimum-liter dinamis dan blokir irigasi jika tidak cukup.
+    // Return true jika volume tangki aman, false jika diblokir.
+    bool checkMinimumWater();
+
+    // Trigger stir sore berdasarkan jam dari MQTT config, dan hentikan stir
+    // jika durasinya sudah tercapai. Hanya jalan di state READY.
+    void handleStirSchedule();
 
     // --- Mixing helpers ---
     // Cek tank aman, nyalakan mixer, set stateInitialized.
@@ -206,6 +228,19 @@ private:
     // State variables untuk deteksi level stabil pada pengisian air manual (FILL_WATER)
     float         lastTankVolume      = -1.0f;
     unsigned long lastLevelChangeTime = 0;
+
+    // --- Stirring & Daily-check state ---
+    // Hari terakhir refreshDailyChecks() dijalankan (cegah re-run pada tick yang sama)
+    uint16_t      _lastDailyCheckDay  = 0xFFFF;
+    bool          _morningStirDone    = false;   // stir pagi sudah dijalankan hari ini
+    bool          _eveningStirDone    = false;   // stir sore sudah dijalankan hari ini
+    bool          _stirring           = false;   // apakah stirrer sedang aktif
+    unsigned long _stirStartMs        = 0;       // kapan stirrer dinyalakan
+
+    // --- Tank-low blocking state ---
+    bool          _tankLowBlocked     = false;   // flag irigasi diblokir karena tank < minimum
+    float         _tankLowDeficit     = 0.0f;    // kekurangan liter terakhir (untuk publish MQTT)
+    bool          _tankLowAlertPending = false;  // flag agar MQTTManager bisa poll dan publish
 
     // --- Timer Fallback Irrigation state ---
     // Flag: set true pada frame pertama setelah IRRIGATION selesai

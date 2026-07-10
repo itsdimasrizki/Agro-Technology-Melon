@@ -83,6 +83,17 @@ public:
     void     setScheduleConfig(uint16_t year, uint8_t month, uint8_t day,
                                uint8_t mixHour, uint8_t mixMinute);
 
+    // ---- Mixing Interval & Stirring Schedule (Extended) ----
+    // Dikonfigurasi via MQTT topic greenhouse/config/mix_schedule_ext
+    uint16_t getMixIntervalDays()    const { return _mixIntervalDays; }
+    float    getPerPlantNeedLiter()  const { return _perPlantNeedLiter; }
+    uint8_t  getStirEveningHour()    const { return _stirEveningHour; }
+    uint8_t  getStirEveningMinute()  const { return _stirEveningMinute; }
+    uint32_t getStirDurationMs()     const { return _stirDurationMs; }
+    void     setMixScheduleExt(uint16_t intervalDays, float perPlantLiter,
+                               uint8_t stirEvHour, uint8_t stirEvMin,
+                               uint32_t stirDurMs);
+
     // True jika minimal satu konfigurasi pernah diterima dari MQTT
     bool isConfigured() const { return _configured; }
 
@@ -132,6 +143,14 @@ private:
     uint8_t  _plantDay       = 1;
     uint8_t  _dailyMixHour   = 5;
     uint8_t  _dailyMixMinute = 0;
+
+    // ---- Mixing Interval & Stirring ----
+    // Tersimpan di NVS namespace "cfg_mix" (terpisah dari cfg_sched)
+    uint16_t _mixIntervalDays    = 1;         // default 1 = mixing tiap hari (backward-compatible)
+    float    _perPlantNeedLiter  = 0.5f;      // kebutuhan air per tanaman per hari (liter)
+    uint8_t  _stirEveningHour    = 18;        // jam stir sore (default 18:00)
+    uint8_t  _stirEveningMinute  = 0;         // menit stir sore
+    uint32_t _stirDurationMs     = 300000UL;  // durasi stir per sesi (default 5 menit)
 
     // ---- Timer Irrigation ----
     float          _dailyWaterVolumeMLPerPlant = 200.0f;  // default 200 ml/tanaman/hari

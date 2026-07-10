@@ -12,6 +12,7 @@ static const char* NS_SYS   = "cfg_sys";
 static const char* NS_SCHED = "cfg_sched";
 static const char* NS_META  = "cfg_meta";
 static const char* NS_TIMER = "cfg_timer";  // Timer Fallback Irrigation
+static const char* NS_MIX   = "cfg_mix";    // Mixing Interval & Stirring Schedule
 
 // =========================================
 // begin() — load dari NVS atau pakai default
@@ -56,6 +57,12 @@ void ConfigManager::applyDefaults() {
     _dailyWaterVolumeMLPerPlant = 0.0f;
     _numIrrigationSlots        = 0;
     memset(_irrigationSlots, 0, sizeof(_irrigationSlots));
+
+    _mixIntervalDays   = 1;
+    _perPlantNeedLiter = 0.0f;
+    _stirEveningHour   = 0;
+    _stirEveningMinute = 0;
+    _stirDurationMs    = 0;
 
     _configured = false;
 }
@@ -126,6 +133,15 @@ void ConfigManager::loadFromNVS() {
                     _numIrrigationSlots * sizeof(IrrigationSlot));
     _prefs.end();
 
+    // Mixing Interval & Stirring
+    _prefs.begin(NS_MIX, true);
+    _mixIntervalDays   = _prefs.getUShort("mixInterval", _mixIntervalDays);
+    _perPlantNeedLiter = _prefs.getFloat("perPlant",    _perPlantNeedLiter);
+    _stirEveningHour   = _prefs.getUChar("stirEvHour",  _stirEveningHour);
+    _stirEveningMinute = _prefs.getUChar("stirEvMin",   _stirEveningMinute);
+    _stirDurationMs    = _prefs.getULong("stirDurMs",   _stirDurationMs);
+    _prefs.end();
+
     Serial.println("[CFG] Loaded from NVS");
 }
 
@@ -185,6 +201,15 @@ void ConfigManager::saveAll() {
                     _numIrrigationSlots * sizeof(IrrigationSlot));
     _prefs.end();
 
+    // Mixing Interval & Stirring
+    _prefs.begin(NS_MIX, false);
+    _prefs.putUShort("mixInterval", _mixIntervalDays);
+    _prefs.putFloat("perPlant",     _perPlantNeedLiter);
+    _prefs.putUChar("stirEvHour",   _stirEveningHour);
+    _prefs.putUChar("stirEvMin",    _stirEveningMinute);
+    _prefs.putULong("stirDurMs",    _stirDurationMs);
+    _prefs.end();
+
     // Meta — tandai sudah dikonfigurasi
     _prefs.begin(NS_META, false);
     _prefs.putBool("configured", true);
@@ -211,6 +236,7 @@ void ConfigManager::clearConfig() {
     _prefs.begin(NS_SYS, false);   _prefs.clear(); _prefs.end();
     _prefs.begin(NS_SCHED, false); _prefs.clear(); _prefs.end();
     _prefs.begin(NS_TIMER, false); _prefs.clear(); _prefs.end();
+    _prefs.begin(NS_MIX, false);   _prefs.clear(); _prefs.end();
 
     _configured = false;
     Serial.println("[CFG] Configuration cleared/wiped.");
@@ -308,4 +334,20 @@ void ConfigManager::setTimerIrrigationConfig(float mlPerPlant,
     saveAll();
     Serial.printf("[CFG] Timer irrigation updated: %.0fmL/plant, %d slots\n",
                   mlPerPlant, count);
+}
+
+void ConfigManager::setMixScheduleExt(uint16_t intervalDays, float perPlantLiter,
+                                      uint8_t stirEvHour, uint8_t stirEvMin,
+                                      uint32_t stirDurMs) {
+    if (intervalDays < 1) intervalDays = 1;
+    _mixIntervalDays   = intervalDays;
+    _perPlantNeedLiter = perPlantLiter;
+    _stirEveningHour   = stirEvHour;
+    _stirEveningMinute = stirEvMin;
+    _stirDurationMs    = stirDurMs;
+    saveAll();
+    Serial.printf("[CFG] Mix schedule ext updated: interval=%d days, perPlant=%.2fL, "
+                  "stirEv=%02d:%02d, stirDur=%lums\n",
+                  intervalDays, perPlantLiter, stirEvHour, stirEvMin,
+                  (unsigned long)stirDurMs);
 }

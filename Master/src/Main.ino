@@ -58,8 +58,6 @@ ConfigManager configManager;
 
 SoilHealthMonitor soilHealth(espNow, configManager);
 
-MQTTManager mqtt(relay, configManager, rtcManager, waterLevel, soilHealth);
-
 // PH TDS
 PHSensor phSensor(PH_PIN);
 
@@ -94,6 +92,8 @@ FertigationFSM fsm(
     configManager,
     soilHealth
 );
+
+MQTTManager mqtt(relay, configManager, rtcManager, waterLevel, soilHealth, fsm);
 
 // ISR
 

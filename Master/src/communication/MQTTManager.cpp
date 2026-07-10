@@ -9,12 +9,13 @@ MQTTManager* MQTTManager::_instance      = nullptr;
 // Constructor
 // =========================================
 MQTTManager::MQTTManager(RelayManager& relay, ConfigManager& config,
-                         RTCManager& rtc, WaterLevel& wl)
+                         RTCManager& rtc, WaterLevel& wl, SoilHealthMonitor& sh)
     : mqttClient(wifiClient),
       relayManager(relay),
       configManager(config),
       rtcManager(rtc),
-      waterLevel(wl)
+      waterLevel(wl),
+      soilHealth(sh)
 {
     _instance = this;
 }
@@ -52,10 +53,21 @@ void MQTTManager::update(
         lastFSMState = fsmState;
     }
 
+    IrrigationMode currentIrrigMode = soilHealth.getMode();
+    if (currentIrrigMode != lastIrrigMode) {
+        publishSoilHealth();
+        lastIrrigMode = currentIrrigMode;
+    }
+
     unsigned long now = millis();
     if (now - lastPublish >= MQTT_PUBLISH_INTERVAL) {
         lastPublish = now;
         publishSensors(sensorData);
+    }
+
+    if (now - lastSoilPublish >= MQTT_PUBLISH_INTERVAL) {
+        lastSoilPublish = now;
+        publishSoilHealth();
     }
 }
 
@@ -202,6 +214,11 @@ void MQTTManager::handleMessage(const char* topic, const String& payload) {
         return;
     }
 
+    if (String(topic) == TOPIC_CMD_SOIL_RESET) {
+        handleSoilResetMode(payload);
+        return;
+    }
+
     // Config topics — parse JSON
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, payload);
@@ -218,6 +235,7 @@ void MQTTManager::handleMessage(const char* topic, const String& payload) {
     else if (t == TOPIC_CFG_IRRIG)    handleConfigIrrigation(doc);
     else if (t == TOPIC_CFG_SYSTEM)   handleConfigSystem(doc);
     else if (t == TOPIC_CFG_SCHEDULE) handleConfigSchedule(doc);
+    else if (t == TOPIC_CFG_TIMER_IRRIG) handleConfigTimerIrrigation(doc);
 }
 
 // =========================================
@@ -365,8 +383,10 @@ void MQTTManager::connectMQTT() {
         mqttClient.subscribe(TOPIC_CFG_IRRIG);
         mqttClient.subscribe(TOPIC_CFG_SYSTEM);
         mqttClient.subscribe(TOPIC_CFG_SCHEDULE);
+        mqttClient.subscribe(TOPIC_CFG_TIMER_IRRIG);
+        mqttClient.subscribe(TOPIC_CMD_SOIL_RESET);
 
-        Serial.println("[MQTT] Subscribed to all topics");
+        Serial.println("[MQTT] Subscribed to all topics including Soil Health and Timer Fallback");
     } else {
         Serial.print(" failed, rc=");
         Serial.println(mqttClient.state());
@@ -418,4 +438,66 @@ const char* MQTTManager::errorCodeToString(ErrorCode error) {
         case ErrorCode::WATER_OVERFLOW:      return "WATER_OVERFLOW";
         default:                             return "UNKNOWN_ERROR";
     }
+}
+
+// =========================================
+// handleConfigTimerIrrigation()
+// =========================================
+void MQTTManager::handleConfigTimerIrrigation(const JsonDocument& doc) {
+    float mlPerPlant = doc["daily_water_volume_ml_per_plant"] | configManager.getDailyWaterVolumeMLPerPlant();
+    JsonArrayConst arr = doc["slots"].as<JsonArrayConst>();
+    
+    if (arr.isNull()) {
+        publishConfigAck("timer_irrigation", false);
+        return;
+    }
+
+    IrrigationSlot slots[MAX_IRRIG_SLOTS];
+    uint8_t count = 0;
+
+    for (JsonObjectConst s : arr) {
+        if (count >= MAX_IRRIG_SLOTS) break;
+        slots[count].hour   = s["hour"]   | (uint8_t)0;
+        slots[count].minute = s["minute"] | (uint8_t)0;
+        count++;
+    }
+
+    configManager.setTimerIrrigationConfig(mlPerPlant, slots, count);
+    publishConfigAck("timer_irrigation", true);
+}
+
+// =========================================
+// handleSoilResetMode()
+// =========================================
+void MQTTManager::handleSoilResetMode(const String& payload) {
+    soilHealth.resetToHumidityMode();
+    publishSoilHealth();
+}
+
+// =========================================
+// publishSoilHealth()
+// =========================================
+void MQTTManager::publishSoilHealth() {
+    JsonDocument doc;
+    doc["device_id"] = MQTT_CLIENT_ID;
+    doc["timestamp"] = millis();
+
+    doc["mode"] = (soilHealth.getMode() == IrrigationMode::TIMER) ? "TIMER" : "HUMIDITY";
+    doc["health_score"] = soilHealth.getHealthScore();
+
+    SoilRuleFlags rules = soilHealth.getActiveRules();
+    JsonObject r = doc["active_rules"].to<JsonObject>();
+    r["heartbeat_timeout"] = rules.heartbeatTimeout;
+    r["out_of_range"]      = rules.outOfRange;
+    r["flatline"]          = rules.flatline;
+    r["no_response"]       = rules.noResponse;
+
+    char buf[256];
+    serializeJson(doc, buf);
+
+    mqttClient.publish(TOPIC_SOIL_HEALTH, buf, true);
+    
+    Serial.printf("[MQTT] Published Soil Health. Mode: %s, Health: %d%%\n", 
+                  (soilHealth.getMode() == IrrigationMode::TIMER) ? "TIMER" : "HUMIDITY", 
+                  soilHealth.getHealthScore());
 }

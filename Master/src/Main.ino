@@ -23,6 +23,7 @@
 #include "sensors/WaterTempSensor.h"
 
 #include "fsm/FertigationFSM.h"
+#include "fsm/SoilHealthMonitor.h"
 
 #include "communication/ESPNowManager.h"
 
@@ -35,6 +36,7 @@ RelayManager relay;
 FlowMeter flowWater(FLOW_WATER_PIN);
 FlowMeter flowA(FLOW_A_PIN);
 FlowMeter flowB(FLOW_B_PIN);
+FlowMeter flowIrrig(FLOW_IRRIG_PIN); // Flow sensor irigasi (Timer mode)
 
 // Water Level
 WaterLevel waterLevel(
@@ -55,7 +57,9 @@ RecoveryManager recovery;
 
 ConfigManager configManager;
 
-MQTTManager mqtt(relay, configManager, rtcManager, waterLevel);
+SoilHealthMonitor soilHealth(espNow, configManager);
+
+MQTTManager mqtt(relay, configManager, rtcManager, waterLevel, soilHealth);
 
 // PH TDS
 PHSensor phSensor(PH_PIN);
@@ -88,8 +92,10 @@ FertigationFSM fsm(
     flowWater,
     flowA,
     flowB,
+    flowIrrig,
     recovery,
-    configManager
+    configManager,
+    soilHealth
 );
 
 // ISR
@@ -103,6 +109,10 @@ void IRAM_ATTR flowAISR() {
 
 void IRAM_ATTR flowBISR() {
     flowB.pulseCount++;
+}
+
+void IRAM_ATTR flowIrrigISR() {
+    flowIrrig.pulseCount++;
 }
 
 void setup() {
@@ -123,6 +133,7 @@ void setup() {
     flowWater.begin(flowWaterISR);
     flowA.begin(flowAISR);
     flowB.begin(flowBISR);
+    flowIrrig.begin(flowIrrigISR);
 
     Serial.println("[4] Wire I2C...");
     Wire.begin(
@@ -157,6 +168,9 @@ void setup() {
     } else {
         Serial.println("  -> ESP-NOW OK");
     }
+
+    Serial.println("[10.5] SoilHealthMonitor...");
+    soilHealth.begin();
 
     Serial.println("[11] FSM...");
     fsm.begin();

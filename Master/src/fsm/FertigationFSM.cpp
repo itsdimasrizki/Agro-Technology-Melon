@@ -3,16 +3,18 @@
 #include "../config/SystemConfig.h"
 
 FertigationFSM::FertigationFSM(
-    SensorManager& sensors,
-    RelayManager& relays,
-    RTCManager& rtc,
-    RecipeManager& recipe,
-    IrrigationRecipe& irrigation,
-    FlowMeter& water,
-    FlowMeter& a,
-    FlowMeter& b,
-    RecoveryManager& recoveryManager,
-    ConfigManager& config
+    SensorManager&     sensors,
+    RelayManager&      relays,
+    RTCManager&        rtc,
+    RecipeManager&     recipe,
+    IrrigationRecipe&  irrigation,
+    FlowMeter&         water,
+    FlowMeter&         a,
+    FlowMeter&         b,
+    FlowMeter&         irrig,
+    RecoveryManager&   recoveryManager,
+    ConfigManager&     config,
+    SoilHealthMonitor& soilHealth
 )
 :
 sensorManager(sensors),
@@ -24,7 +26,9 @@ recovery(recoveryManager),
 configManager(config),
 waterFlow(water),
 nutrientAFlow(a),
-nutrientBFlow(b)
+nutrientBFlow(b),
+irrigFlow(irrig),
+soilHealthMonitor(soilHealth)
 {
     lastStateBeforeError = FertigationState::IDLE;
 
@@ -49,6 +53,12 @@ nutrientBFlow(b)
     lastPulseTime = 0;
     pulseOpenState = false;
     correctionOrigin = FertigationState::VALIDATE;
+
+    _irrigJustCompleted = false;
+    _activeSlotIdx = -1;
+    _timerSlotRunning = false;
+    _timerTargetML = 0.0f;
+    _lastSlotMinute = 0xFFFF;
 }
 
 //! Begin
@@ -801,6 +811,17 @@ void FertigationFSM::handleCorrectionMix() {
 }
 
 void FertigationFSM::handleReady() {
+    // Update monitor status
+    soilHealthMonitor.update(sensor.soilADC, _irrigJustCompleted, currentIrrigation.wetThreshold);
+    _irrigJustCompleted = false;
+
+    // Check mode
+    if (soilHealthMonitor.getMode() == IrrigationMode::TIMER) {
+        handleTimerIrrigation();
+        return;
+    }
+
+    // Normal HUMIDITY mode
     if (sensor.soilADC >= currentIrrigation.dryThreshold) {
         changeState(FertigationState::PRE_IRRIGATION_MIX);
     }
@@ -844,7 +865,75 @@ void FertigationFSM::handleIrrigation() {
     if (sensor.soilADC <= currentIrrigation.wetThreshold) {
         relayManager.off(RELAY_PUMP_MIX);
         relayManager.off(RELAY_SOLENOID_IRRIG);
+        _irrigJustCompleted = true; // Set flag for SoilHealthMonitor
         gotoReady();
+    }
+}
+
+void FertigationFSM::handleTimerIrrigation() {
+    uint8_t rtcHour = rtcManager.getHour();
+    uint8_t rtcMinute = rtcManager.getMinute();
+
+    if (!_timerSlotRunning) {
+        uint8_t numSlots = configManager.getNumIrrigationSlots();
+        if (numSlots == 0) return;
+
+        // Cegah pemicuan berulang pada menit yang sama
+        if (rtcMinute == _lastSlotMinute) {
+            return;
+        }
+
+        int8_t triggeredSlot = -1;
+        for (uint8_t i = 0; i < numSlots; i++) {
+            IrrigationSlot slot = configManager.getIrrigationSlot(i);
+            if (slot.hour == rtcHour && slot.minute == rtcMinute) {
+                triggeredSlot = i;
+                break;
+            }
+        }
+
+        if (triggeredSlot != -1) {
+            // Hitung target volume untuk slot ini dalam mL
+            float dailyVolML = configManager.getDailyWaterVolumeMLPerPlant() * configManager.getTotalPlants();
+            _timerTargetML = dailyVolML / numSlots;
+
+            // Reset flow meter irigasi
+            irrigFlow.reset();
+
+            // Jalankan solenoid + pompa irigasi
+            relayManager.on(RELAY_PUMP_MIX);
+            relayManager.on(RELAY_SOLENOID_IRRIG);
+
+            _timerSlotRunning = true;
+            _activeSlotIdx = triggeredSlot;
+            _lastSlotMinute = rtcMinute;
+
+            Serial.printf("[FSM] Timer Fallback Irrigation Triggered: Slot %d at %02d:%02d. Target: %.1f mL (%.3f L)\n",
+                          _activeSlotIdx, rtcHour, rtcMinute, _timerTargetML, _timerTargetML / 1000.0f);
+        }
+    } else {
+        // Sedang irigasi timer, monitor flow sensor
+        float currentVolLiters = irrigFlow.getVolumeLiter();
+        float targetLiters = _timerTargetML / 1000.0f;
+
+        // Log progress setiap 5 detik
+        static unsigned long lastLog = 0;
+        if (millis() - lastLog >= 5000) {
+            lastLog = millis();
+            Serial.printf("[FSM] Timer Irrig Slot %d Progress: %.3f L / %.3f L\n", _activeSlotIdx, currentVolLiters, targetLiters);
+        }
+
+        if (currentVolLiters >= targetLiters) {
+            // Tutup solenoid + matikan pompa
+            relayManager.off(RELAY_PUMP_MIX);
+            relayManager.off(RELAY_SOLENOID_IRRIG);
+
+            Serial.printf("[FSM] Timer Fallback Irrigation Completed: Slot %d. Total: %.3f L\n", _activeSlotIdx, currentVolLiters);
+
+            _timerSlotRunning = false;
+            _activeSlotIdx = -1;
+            _irrigJustCompleted = true; // Pemicu evaluation pasca-watering pada SoilHealthMonitor
+        }
     }
 }
 

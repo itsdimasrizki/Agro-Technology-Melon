@@ -9,6 +9,7 @@
 // =========================================
 constexpr uint8_t MAX_RECIPE_STAGES     = 7;
 constexpr uint8_t MAX_IRRIGATION_STAGES = 7;
+constexpr uint8_t MAX_IRRIG_SLOTS       = 10;  // Maks slot jadwal irigasi per hari (Timer mode)
 
 // =========================================
 // Stage structs (runtime, dari ConfigManager)
@@ -24,6 +25,12 @@ struct IrrigationStageConfig {
     uint16_t maxAgeDays;
     uint16_t dryThreshold;
     uint16_t wetThreshold;
+};
+
+// Satu slot jadwal irigasi untuk Timer Fallback mode
+struct IrrigationSlot {
+    uint8_t hour;    // jam (0-23)
+    uint8_t minute;  // menit (0-59)
 };
 
 // =========================================
@@ -82,6 +89,13 @@ public:
     // Hapus konfigurasi dan set ke default kosong
     void clearConfig();
 
+    // ---- Timer Irrigation (Timer Fallback mode) ----
+    float          getDailyWaterVolumeMLPerPlant() const { return _dailyWaterVolumeMLPerPlant; }
+    uint8_t        getNumIrrigationSlots()         const { return _numIrrigationSlots; }
+    IrrigationSlot getIrrigationSlot(uint8_t i)    const;
+    void           setTimerIrrigationConfig(float mlPerPlant,
+                                            const IrrigationSlot* slots, uint8_t count);
+
 private:
     void applyDefaults();
     void loadFromNVS();
@@ -118,6 +132,11 @@ private:
     uint8_t  _plantDay       = 1;
     uint8_t  _dailyMixHour   = 5;
     uint8_t  _dailyMixMinute = 0;
+
+    // ---- Timer Irrigation ----
+    float          _dailyWaterVolumeMLPerPlant = 200.0f;  // default 200 ml/tanaman/hari
+    IrrigationSlot _irrigationSlots[MAX_IRRIG_SLOTS];
+    uint8_t        _numIrrigationSlots = 0;
 
     // Flag: apakah sudah pernah dikonfigurasi via MQTT
     bool _configured = false;

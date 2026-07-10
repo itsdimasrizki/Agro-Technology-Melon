@@ -29,4 +29,32 @@ constexpr float          WATER_LEVEL_NOISE_THRESHOLD  = 0.1f;     // liter
 // Durasi level harus stabil (tidak berubah) setelah buzzer ON sebelum FSM lanjut ke PRE_MIX_A
 constexpr unsigned long  WATER_LEVEL_STABLE_TIMEOUT   = 60000UL;  // 1 menit
 
+// =========================================
+// Soil Health Monitor
+// =========================================
+
+// Interval evaluasi health score (ms)
+constexpr unsigned long SOIL_HEALTH_EVAL_INTERVAL    = 300000UL;  // 5 menit
+
+// Rule #1: Heartbeat — berapa lama tidak ada paket ESP-NOW baru dianggap timeout
+constexpr unsigned long SOIL_HEARTBEAT_TIMEOUT       = 300000UL;  // 5 menit
+
+// Rule #2: Out-of-range — batas ADC wajar hasil kalibrasi kapasitif (kering ~ 3900, basah ~ 3400)
+// Probe fisik: di bawah MIN atau di atas MAX menandakan sensor lepas/rusak keras
+constexpr uint16_t      SOIL_ADC_MIN_VALID           = 800;       // batas bawah ADC wajar
+constexpr uint16_t      SOIL_ADC_MAX_VALID           = 4095;      // batas atas ADC wajar
+
+// Rule #3: Flatline — max delta ADC dalam ring buffer yang masih dianggap "stuck"
+constexpr uint16_t      SOIL_FLATLINE_DELTA          = 50;        // delta ADC
+// Ukuran ring buffer sampel ADC untuk deteksi flatline
+constexpr uint8_t       SOIL_ADC_BUFFER_SIZE          = 8;
+// Jumlah minimum siklus irigasi selesai sebelum flatline mulai dievaluasi
+constexpr uint8_t       SOIL_MIN_CYCLES_FOR_FLATLINE  = 2;
+
+// Rule #4: No response after watering — delta ADC minimum yang diharapkan turun setelah irigasi
+constexpr uint16_t      SOIL_RESPONSE_MIN_DELTA      = 100;
+
+// Health score threshold — jika health <= ini, auto-switch ke mode TIMER
+constexpr uint8_t       SOIL_HEALTH_SWITCH_THRESHOLD  = 50;
+
 #endif

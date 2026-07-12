@@ -69,10 +69,10 @@ public:
     // ---- System ----
     uint16_t getTotalPlants()            const { return _totalPlants; }
     float    getMaxConsumptionPerPlant() const { return _maxConsumptionPerPlant; }
-    float    getDailyTargetVolume()      const { return _dailyTargetVolume; }
+    float    getTargetFillVolume()       const { return _targetFillVolume; }
     float    getTankCapacityLiter()      const { return _tankCapacityLiter; }
     void     setSystemConfig(uint16_t plants, float maxConsumption,
-                             float dailyVolume, float tankCapacity);
+                             float targetFillVolume, float tankCapacity);
 
     // ---- Schedule ----
     uint16_t getPlantYear()      const { return _plantYear; }
@@ -83,16 +83,12 @@ public:
     void     setScheduleConfig(uint16_t year, uint8_t month, uint8_t day,
                                uint8_t mixHour, uint8_t mixMinute);
 
-    // ---- Mixing Interval & Stirring Schedule (Extended) ----
+    // ---- Stirring Schedule ----
     // Dikonfigurasi via MQTT topic greenhouse/config/mix_schedule_ext
-    uint16_t getMixIntervalDays()    const { return _mixIntervalDays; }
-    float    getPerPlantNeedLiter()  const { return _perPlantNeedLiter; }
     uint8_t  getStirEveningHour()    const { return _stirEveningHour; }
     uint8_t  getStirEveningMinute()  const { return _stirEveningMinute; }
     uint32_t getStirDurationMs()     const { return _stirDurationMs; }
-    void     setMixScheduleExt(uint16_t intervalDays, float perPlantLiter,
-                               uint8_t stirEvHour, uint8_t stirEvMin,
-                               uint32_t stirDurMs);
+    void     setStirSchedule(uint8_t stirEvHour, uint8_t stirEvMin, uint32_t stirDurMs);
 
     // True jika minimal satu konfigurasi pernah diterima dari MQTT
     bool isConfigured() const { return _configured; }
@@ -134,7 +130,7 @@ private:
     // ---- System ----
     uint16_t _totalPlants            = 80;
     float    _maxConsumptionPerPlant = 15.0f;
-    float    _dailyTargetVolume      = 1.0f;
+    float    _targetFillVolume       = 1.0f;
     float    _tankCapacityLiter      = 15.0f;
 
     // ---- Schedule ----
@@ -144,10 +140,8 @@ private:
     uint8_t  _dailyMixHour   = 5;
     uint8_t  _dailyMixMinute = 0;
 
-    // ---- Mixing Interval & Stirring ----
-    // Tersimpan di NVS namespace "cfg_mix" (terpisah dari cfg_sched)
-    uint16_t _mixIntervalDays    = 1;         // default 1 = mixing tiap hari (backward-compatible)
-    float    _perPlantNeedLiter  = 0.5f;      // kebutuhan air per tanaman per hari (liter)
+    // ---- Stirring Schedule ----
+    // Tersimpan di NVS namespace "cfg_mix"
     uint8_t  _stirEveningHour    = 18;        // jam stir sore (default 18:00)
     uint8_t  _stirEveningMinute  = 0;         // menit stir sore
     uint32_t _stirDurationMs     = 300000UL;  // durasi stir per sesi (default 5 menit)

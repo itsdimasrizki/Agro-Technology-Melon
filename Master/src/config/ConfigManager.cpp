@@ -45,7 +45,7 @@ void ConfigManager::applyDefaults() {
 
     _totalPlants            = 0;
     _maxConsumptionPerPlant = 0.0f;
-    _dailyTargetVolume      = 0.0f;
+    _targetFillVolume       = 0.0f;
     _tankCapacityLiter      = 0.0f;
 
     _plantYear      = 0;
@@ -58,8 +58,6 @@ void ConfigManager::applyDefaults() {
     _numIrrigationSlots        = 0;
     memset(_irrigationSlots, 0, sizeof(_irrigationSlots));
 
-    _mixIntervalDays   = 1;
-    _perPlantNeedLiter = 0.0f;
     _stirEveningHour   = 0;
     _stirEveningMinute = 0;
     _stirDurationMs    = 0;
@@ -111,7 +109,7 @@ void ConfigManager::loadFromNVS() {
     _prefs.begin(NS_SYS, true);
     _totalPlants            = _prefs.getUShort("plants",  _totalPlants);
     _maxConsumptionPerPlant = _prefs.getFloat("maxCons",  _maxConsumptionPerPlant);
-    _dailyTargetVolume      = _prefs.getFloat("dayVol",   _dailyTargetVolume);
+    _targetFillVolume       = _prefs.getFloat("dayVol",   _targetFillVolume);
     _tankCapacityLiter      = _prefs.getFloat("tankCap",  _tankCapacityLiter);
     _prefs.end();
 
@@ -133,10 +131,8 @@ void ConfigManager::loadFromNVS() {
                     _numIrrigationSlots * sizeof(IrrigationSlot));
     _prefs.end();
 
-    // Mixing Interval & Stirring
+    // Stirring Schedule
     _prefs.begin(NS_MIX, true);
-    _mixIntervalDays   = _prefs.getUShort("mixInterval", _mixIntervalDays);
-    _perPlantNeedLiter = _prefs.getFloat("perPlant",    _perPlantNeedLiter);
     _stirEveningHour   = _prefs.getUChar("stirEvHour",  _stirEveningHour);
     _stirEveningMinute = _prefs.getUChar("stirEvMin",   _stirEveningMinute);
     _stirDurationMs    = _prefs.getULong("stirDurMs",   _stirDurationMs);
@@ -180,7 +176,7 @@ void ConfigManager::saveAll() {
     _prefs.begin(NS_SYS, false);
     _prefs.putUShort("plants",  _totalPlants);
     _prefs.putFloat("maxCons",  _maxConsumptionPerPlant);
-    _prefs.putFloat("dayVol",   _dailyTargetVolume);
+    _prefs.putFloat("dayVol",   _targetFillVolume);
     _prefs.putFloat("tankCap",  _tankCapacityLiter);
     _prefs.end();
 
@@ -201,10 +197,8 @@ void ConfigManager::saveAll() {
                     _numIrrigationSlots * sizeof(IrrigationSlot));
     _prefs.end();
 
-    // Mixing Interval & Stirring
+    // Stirring Schedule
     _prefs.begin(NS_MIX, false);
-    _prefs.putUShort("mixInterval", _mixIntervalDays);
-    _prefs.putFloat("perPlant",     _perPlantNeedLiter);
     _prefs.putUChar("stirEvHour",   _stirEveningHour);
     _prefs.putUChar("stirEvMin",    _stirEveningMinute);
     _prefs.putULong("stirDurMs",    _stirDurationMs);
@@ -278,14 +272,14 @@ void ConfigManager::setIrrigationStages(const IrrigationStageConfig* stages, uin
 }
 
 void ConfigManager::setSystemConfig(uint16_t plants, float maxConsumption,
-                                    float dailyVolume, float tankCapacity) {
+                                    float targetFillVolume, float tankCapacity) {
     _totalPlants            = plants;
     _maxConsumptionPerPlant = maxConsumption;
-    _dailyTargetVolume      = dailyVolume;
+    _targetFillVolume       = targetFillVolume;
     _tankCapacityLiter      = tankCapacity;
     saveAll();
-    Serial.printf("[CFG] System updated: plants=%d, dailyVol=%.2fL, tankCap=%.2fL\n",
-                  plants, dailyVolume, tankCapacity);
+    Serial.printf("[CFG] System updated: plants=%d, targetFillVol=%.2fL, tankCap=%.2fL\n",
+                  plants, targetFillVolume, tankCapacity);
 }
 
 void ConfigManager::setScheduleConfig(uint16_t year, uint8_t month, uint8_t day,
@@ -336,18 +330,12 @@ void ConfigManager::setTimerIrrigationConfig(float mlPerPlant,
                   mlPerPlant, count);
 }
 
-void ConfigManager::setMixScheduleExt(uint16_t intervalDays, float perPlantLiter,
-                                      uint8_t stirEvHour, uint8_t stirEvMin,
-                                      uint32_t stirDurMs) {
-    if (intervalDays < 1) intervalDays = 1;
-    _mixIntervalDays   = intervalDays;
-    _perPlantNeedLiter = perPlantLiter;
+void ConfigManager::setStirSchedule(uint8_t stirEvHour, uint8_t stirEvMin,
+                                    uint32_t stirDurMs) {
     _stirEveningHour   = stirEvHour;
     _stirEveningMinute = stirEvMin;
     _stirDurationMs    = stirDurMs;
     saveAll();
-    Serial.printf("[CFG] Mix schedule ext updated: interval=%d days, perPlant=%.2fL, "
-                  "stirEv=%02d:%02d, stirDur=%lums\n",
-                  intervalDays, perPlantLiter, stirEvHour, stirEvMin,
-                  (unsigned long)stirDurMs);
+    Serial.printf("[CFG] Stir schedule updated: stirEv=%02d:%02d, stirDur=%lums\n",
+                  stirEvHour, stirEvMin, (unsigned long)stirDurMs);
 }

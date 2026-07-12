@@ -28,6 +28,10 @@ constexpr uint32_t      CORRECTION_DELAY    = 180000UL; // 3 menit
 constexpr float          WATER_LEVEL_NOISE_THRESHOLD  = 0.1f;     // liter
 // Durasi level harus stabil (tidak berubah) setelah buzzer ON sebelum FSM lanjut ke PRE_MIX_A
 constexpr unsigned long  WATER_LEVEL_STABLE_TIMEOUT   = 60000UL;  // 1 menit
+// Volume minimum tangki (safety floor) untuk proteksi pompa dari dry-run (checkMinimumWater Opsi A)
+constexpr float          TANK_SAFETY_FLOOR_LITER       = 5.0f;
+// Interval pengiriman ulang alert "butuh diisi" ke MQTT selama menunggu di FILL_WATER
+constexpr unsigned long  NEED_REFILL_ALERT_INTERVAL_MS = 30000UL; // 30 detik
 
 // =========================================
 // Soil Health Monitor

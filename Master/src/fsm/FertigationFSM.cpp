@@ -37,7 +37,6 @@ soilHealthMonitor(soilHealth)
 
     stateInitialized = false;
 
-    targetWaterVolume = 0;
     targetNutrientA = 0;
     targetNutrientB = 0;
 
@@ -219,14 +218,6 @@ bool FertigationFSM::isPPMInRange() {
     return abs(sensor.ppm - targetPPM) <= configManager.getPPMTolerance();
 }
 
-// isMixDue() menggantikan isTodayAlreadyMixed().
-// Logic: selisih hari sejak lastMixDay >= mixIntervalDays.
-// mixIntervalDays=1 (default) → perilaku identik dengan isTodayAlreadyMixed() lama.
-bool FertigationFSM::isMixDue() {
-    uint16_t day = rtcManager.getPlantAgeDays();
-    return (day - lastMixDay) >= configManager.getMixIntervalDays();
-}
-
 bool FertigationFSM::isStateTimeout(unsigned long timeout) {
     return millis() - stateStartTime > timeout;
 }
@@ -302,52 +293,20 @@ void FertigationFSM::stopNutrientB() {
 
 //! RECIPE
 void FertigationFSM::prepareDailyRecipe() {
-    uint16_t age      = rtcManager.getPlantAgeDays();
-    uint16_t interval = configManager.getMixIntervalDays();
+    uint16_t age = rtcManager.getPlantAgeDays();
 
-    // Grouping: ambil nilai paling konservatif dari semua hari dalam siklus mixing ini.
-    // - minPPM      : target PPM PALING RENDAH dalam grup (cegah over-dosis di hari mana pun)
-    // - maxOfMinPH  : batas bawah pH PALING TINGGI dalam grup (irisan rentang)
-    // - minOfMaxPH  : batas atas pH PALING RENDAH dalam grup (irisan rentang)
-    float minPPM     = 1.0e9f;
-    float maxOfMinPH = 0.0f;
-    float minOfMaxPH = 14.0f;
+    // Ambil resep hari ini langsung — tidak ada lagi grouping N-hari.
+    // Fungsi ini dipanggil SETELAH tangki penuh (di akhir FILL_WATER),
+    // sehingga dosis selalu full dose tanpa scaling rasio.
+    NutrientRecipe r = recipeManager.getRecipe(age);
+    targetPPM    = (uint16_t)r.targetPPM;
+    targetMinPH  = r.targetMinPH;
+    targetMaxPH  = r.targetMaxPH;
 
-    for (uint16_t d = age; d < age + interval; d++) {
-        NutrientRecipe r = recipeManager.getRecipe(d);
-        if (r.targetPPM    < minPPM)     minPPM     = r.targetPPM;
-        if (r.targetMinPH  > maxOfMinPH) maxOfMinPH = r.targetMinPH;
-        if (r.targetMaxPH  < minOfMaxPH) minOfMaxPH = r.targetMaxPH;
-    }
+    targetNutrientA = configManager.getInitialNutrientA();
+    targetNutrientB = configManager.getInitialNutrientB();
 
-    // Validasi: irisan rentang pH harus valid
-    if (maxOfMinPH > minOfMaxPH) {
-        logError("[FSM] pH resep tidak overlap dalam grup N-hari — batalkan mixing (RECIPE_PH_CONFLICT)");
-        gotoError(ErrorCode::RECIPE_PH_CONFLICT);
-        return;
-    }
-
-    targetPPM    = (uint16_t)minPPM;
-    targetMinPH  = maxOfMinPH;
-    targetMaxPH  = minOfMaxPH;
-
-    float remainingVolume = sensor.tankVolume;
-    float dailyTargetVol  = configManager.getDailyTargetVolume();
-    targetWaterVolume = dailyTargetVol - remainingVolume;
-
-    if (targetWaterVolume < 0.0f) targetWaterVolume = 0.0f;
-
-    float ratio = targetWaterVolume / dailyTargetVol;
-    if (ratio > 1.0f) ratio = 1.0f;
-    if (ratio < 0.0f) ratio = 0.0f;
-
-    targetNutrientA = configManager.getInitialNutrientA() * ratio;
-    targetNutrientB = configManager.getInitialNutrientB() * ratio;
-
-    Serial.printf("[FSM] Recipe group (day %u, interval %u): minPPM=%.0f, pH=[%.1f-%.1f]\n",
-                  age, interval, minPPM, maxOfMinPH, minOfMaxPH);
-
-    logRecipe(remainingVolume, ratio);
+    logRecipe();
 }
 
 // =========================================
@@ -382,47 +341,22 @@ void FertigationFSM::refreshDailyChecks() {
 }
 
 // =========================================
-// checkMinimumWater()
-// Hitung minimum volume aman = sisaHari * (perPlantNeedLiter * totalPlants).
-// Blokir irigasi jika tangki di bawah batas, set warning dan pending alert.
+// checkMinimumWater() — Opsi A: safety floor sederhana
+// Blokir irigasi jika tangki mendekati kosong untuk mencegah dry-run pompa.
+// Tidak terkait target fill harian — murni proteksi hardware.
 // Return true jika aman, false jika diblokir.
 // =========================================
 bool FertigationFSM::checkMinimumWater() {
-    uint16_t age        = rtcManager.getPlantAgeDays();
-    uint16_t interval   = configManager.getMixIntervalDays();
-    float    perPlant   = configManager.getPerPlantNeedLiter();
-    float    plants     = (float)configManager.getTotalPlants();
-
-    // Hari ke-berapa dalam siklus saat ini (0-based)
-    uint16_t dayInCycle = (age >= lastMixDay) ? (age - lastMixDay) : 0;
-    // Sisa hari yang harus dicukupi oleh sisa tangki (minimum 1)
-    uint16_t sisaHari   = (dayInCycle < interval) ? (interval - dayInCycle) : 1;
-
-    float minimumSafe   = (float)sisaHari * (perPlant * plants);
-
-    // perPlantNeedLiter=0 berarti fitur belum dikonfigurasi — skip guard
-    if (perPlant <= 0.0f || minimumSafe <= 0.0f) {
-        if (_tankLowBlocked) {
-            _tankLowBlocked = false;
-            clearWarning();
-        }
-        return true;
-    }
-
-    if (sensor.tankVolume < minimumSafe) {
-        float deficit = minimumSafe - sensor.tankVolume;
+    if (sensor.tankVolume < TANK_SAFETY_FLOOR_LITER) {
         if (!_tankLowBlocked) {
-            _tankLowBlocked      = true;
-            _tankLowDeficit      = deficit;
-            _tankLowAlertPending = true;
-            setWarning(ErrorCode::TANK_LOW);
-            Serial.printf("[FSM] Tank LOW: vol=%.1fL < min=%.1fL (deficit=%.1fL)\n",
-                          sensor.tankVolume, minimumSafe, deficit);
+            _tankLowBlocked = true;
+            setWarning(ErrorCode::WAITING_FOR_FILL);
+            Serial.printf("[FSM] Tank di bawah safety floor (%.1fL < %.1fL) — irigasi diblokir\n",
+                          sensor.tankVolume, TANK_SAFETY_FLOOR_LITER);
         }
         return false;
     }
 
-    // Volume cukup — clear warning jika sebelumnya diblokir
     if (_tankLowBlocked) {
         _tankLowBlocked = false;
         clearWarning();
@@ -638,8 +572,10 @@ void FertigationFSM::handleWaitDailyMix() {
     // refreshDailyChecks() di-guard internal agar hanya jalan sekali per hari.
     refreshDailyChecks();
 
-    // Trigger mixing hanya jika: jam mixing AND sudah waktunya sesuai interval N-hari
-    if (hour == rtcManager.getDailyMixHour() && minute == rtcManager.getDailyMixMinute() && isMixDue()) {
+    // Trigger mixing tiap pagi di jam yang dikonfigurasi — guard per hari agar tidak retrigger
+    // dalam menit yang sama (cek lastMixDay vs plant age hari ini)
+    if (hour == rtcManager.getDailyMixHour() && minute == rtcManager.getDailyMixMinute()
+        && day != lastMixDay) {
         lastMixDay   = day;
         lastMixMonth = month;
         lastMixYear  = year;
@@ -648,7 +584,8 @@ void FertigationFSM::handleWaitDailyMix() {
 }
 
 void FertigationFSM::handlePrepareDailyMix() {
-    prepareDailyRecipe();
+    // Reset flow meter dan tunggu pengisian air manual di FILL_WATER.
+    // prepareDailyRecipe() dipanggil setelah tangki penuh (di akhir handleFillWater()).
     nutrientAFlow.reset();
     nutrientBFlow.reset();
     clearRecovery();
@@ -663,8 +600,9 @@ void FertigationFSM::handleFillWater() {
 
     if (!stateInitialized) {
         consumeRecovery();
-        lastTankVolume    = sensor.tankVolume;
+        lastTankVolume      = sensor.tankVolume;
         lastLevelChangeTime = millis();
+        _lastRefillAlertMs  = 0;  // paksa kirim alert segera
         startFillStirrer();
         stateInitialized = true;
         logStateAction("[FSM] Menunggu pengisian air manual...");
@@ -684,15 +622,25 @@ void FertigationFSM::handleFillWater() {
     }
 
     // Buzzer ON saat target tercapai; mati sendiri setelah level stabil >= WATER_LEVEL_STABLE_TIMEOUT
-    if (sensor.tankVolume >= configManager.getDailyTargetVolume()) {
+    if (sensor.tankVolume >= configManager.getTargetFillVolume()) {
         startBuzzer();
         if (millis() - lastLevelChangeTime >= WATER_LEVEL_STABLE_TIMEOUT) {
             stopBuzzer();
             stopFillStirrer();
+            // Hitung dosis nutrisi SETELAH tangki penuh — full dose, tanpa scaling rasio
+            prepareDailyRecipe();
             changeState(FertigationState::PRE_MIX_A);
         }
     } else {
         stopBuzzer();
+        // Kirim alert "butuh diisi" ke MQTT secara periodik selama menunggu
+        if (millis() - _lastRefillAlertMs >= NEED_REFILL_ALERT_INTERVAL_MS) {
+            _lastRefillAlertMs        = millis();
+            _refillDeficit            = configManager.getTargetFillVolume() - sensor.tankVolume;
+            _needRefillAlertPending   = true;
+            Serial.printf("[FSM] Menunggu pengisian: vol=%.1fL, target=%.1fL, kurang=%.1fL\n",
+                          sensor.tankVolume, configManager.getTargetFillVolume(), _refillDeficit);
+        }
     }
 }
 
@@ -1118,20 +1066,20 @@ void FertigationFSM::logStateAction(const char* message) {
     Serial.println(message);
 }
 
-void FertigationFSM::logRecipe(float remainingVolume, float ratio) {
+void FertigationFSM::logRecipe() {
     Serial.println();
-    Serial.println("===== PARTIAL RECIPE =====");
-    Serial.print("Remaining Volume : ");
-    Serial.println(remainingVolume);
-    Serial.print("Water To Add : ");
-    Serial.println(targetWaterVolume);
-    Serial.print("Ratio : ");
-    Serial.println(ratio);
+    Serial.println("===== DAILY RECIPE =====");
+    Serial.print("Target PPM : ");
+    Serial.println(targetPPM);
+    Serial.print("pH Range   : ");
+    Serial.print(targetMinPH);
+    Serial.print(" - ");
+    Serial.println(targetMaxPH);
     Serial.print("Nutrient A : ");
     Serial.println(targetNutrientA);
     Serial.print("Nutrient B : ");
     Serial.println(targetNutrientB);
-    Serial.println("==========================");
+    Serial.println("========================");
 }
 
 void FertigationFSM::logError() {
@@ -1162,13 +1110,13 @@ void FertigationFSM::logRecovery(
 //      |
 //      v
 // WAIT_DAILY_MIX
-//      | jam DAILY_MIX_HOUR:DAILY_MIX_MINUTE && !isTodayAlreadyMixed
+//      | jam DAILY_MIX_HOUR:DAILY_MIX_MINUTE && plantAgeDays != lastMixDay
 //      v
 // PREPARE_DAILY_MIX
 //      |
 //      v
 // FILL_WATER
-//      | sensor.tankVolume >= configManager.getDailyTargetVolume()
+//      | sensor.tankVolume >= configManager.getTargetFillVolume()
 //      |   → buzzer ON
 //      |   → level stabil (tidak berubah >= WATER_LEVEL_STABLE_TIMEOUT)
 //      |   → buzzer OFF, stirrer OFF

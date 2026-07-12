@@ -1,4 +1,5 @@
 #include "MQTTManager.h"
+#include <WiFiManager.h>
 
 // Static member definitions
 String       MQTTManager::incomingCommand = "";
@@ -61,10 +62,10 @@ void MQTTManager::update(
         lastIrrigMode = currentIrrigMode;
     }
 
-    // Polling tank-low alert dari FSM (flag + getter pattern, tanpa coupling balik)
-    if (fsm.isTankLowAlertPending()) {
-        publishTankLowAlert(fsm.getTankLowDeficit());
-        fsm.clearTankLowAlert();
+    // Polling need-refill alert dari FSM (flag + getter pattern, tanpa coupling balik)
+    if (fsm.isNeedRefillAlertPending()) {
+        publishNeedRefillAlert(fsm.getRefillDeficit());
+        fsm.clearNeedRefillAlert();
     }
 
     unsigned long now = millis();
@@ -314,12 +315,12 @@ void MQTTManager::handleConfigIrrigation(const JsonDocument& doc) {
 }
 
 void MQTTManager::handleConfigSystem(const JsonDocument& doc) {
-    uint16_t plants  = doc["total_plants"]              | configManager.getTotalPlants();
-    float maxCons    = doc["max_consumption_per_plant"] | configManager.getMaxConsumptionPerPlant();
-    float dailyVol   = doc["daily_target_volume"]       | configManager.getDailyTargetVolume();
-    float tankCap    = doc["tank_capacity_liter"]       | configManager.getTankCapacityLiter();
+    uint16_t plants      = doc["total_plants"]              | configManager.getTotalPlants();
+    float    maxCons     = doc["max_consumption_per_plant"] | configManager.getMaxConsumptionPerPlant();
+    float    targetFill  = doc["target_fill_volume"]        | configManager.getTargetFillVolume();
+    float    tankCap     = doc["tank_capacity_liter"]       | configManager.getTankCapacityLiter();
 
-    configManager.setSystemConfig(plants, maxCons, dailyVol, tankCap);
+    configManager.setSystemConfig(plants, maxCons, targetFill, tankCap);
 
     // Propagate ke WaterLevel sensor langsung
     waterLevel.setTankCapacity(tankCap);
@@ -344,28 +345,48 @@ void MQTTManager::handleConfigSchedule(const JsonDocument& doc) {
 }
 
 // =========================================
-// connectWiFi()
+// connectWiFi() — via WiFiManager captive portal
+// Kredensial disimpan di NVS oleh WiFiManager.
+// Jika belum pernah dikonfigurasi / koneksi gagal, buka AP "Melon-Fertigation-Setup"
+// dengan captive portal bertema hijau-putih selama 180 detik.
 // =========================================
 void MQTTManager::connectWiFi() {
     if (WiFi.status() == WL_CONNECTED) return;
 
-    Serial.print("[WiFi] Connecting to ");
-    Serial.print(WIFI_SSID);
+    static const char* customCSS = R"rawhtml(
+<style>
+  body { background-color: #f1f8e9; font-family: sans-serif; color: #1b5e20; margin: 0; padding: 0; }
+  h1   { color: #2e7d32; }
+  h3   { color: #388e3c; }
+  .c   { background: #ffffff; border-radius: 8px; padding: 16px; }
+  input[type=text], input[type=password] {
+    border: 1px solid #4caf50; border-radius: 4px;
+    padding: 8px; width: 100%; box-sizing: border-box;
+  }
+  input[type=submit] {
+    background-color: #4caf50; color: white;
+    border: none; border-radius: 4px; padding: 10px 20px;
+    cursor: pointer; width: 100%;
+  }
+  input[type=submit]:hover { background-color: #2e7d32; }
+  a { color: #2e7d32; }
+  .q { background-color: #4caf50; }
+</style>
+)rawhtml";
 
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFiManager wm;
+    wm.setCustomHeadElement(customCSS);
+    wm.setConfigPortalTimeout(180);
+    wm.setTitle("\xF0\x9F\x8C\xB1 Greenhouse Melon");  // 🌱 Greenhouse Melon
 
-    uint8_t attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-        delay(500);
-        Serial.print(".");
-        attempts++;
-    }
+    Serial.println("[WiFi] Memulai WiFiManager...");
+    bool connected = wm.autoConnect("Melon-Fertigation-Setup");
 
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.print("\n[WiFi] Connected, IP: ");
+    if (connected) {
+        Serial.print("[WiFi] Connected, IP: ");
         Serial.println(WiFi.localIP());
     } else {
-        Serial.println("\n[WiFi] Failed — will retry next update()");
+        Serial.println("[WiFi] Gagal terhubung / portal timeout — will retry next update()");
     }
 }
 
@@ -446,8 +467,7 @@ const char* MQTTManager::errorCodeToString(ErrorCode error) {
         case ErrorCode::PH_OUT_OF_RANGE:     return "PH_OUT_OF_RANGE";
         case ErrorCode::CORRECTION_FAILED:   return "CORRECTION_FAILED";
         case ErrorCode::WATER_OVERFLOW:      return "WATER_OVERFLOW";
-        case ErrorCode::RECIPE_PH_CONFLICT:  return "RECIPE_PH_CONFLICT";
-        case ErrorCode::TANK_LOW:            return "TANK_LOW";
+        case ErrorCode::WAITING_FOR_FILL:    return "WAITING_FOR_FILL";
         default:                             return "UNKNOWN_ERROR";
     }
 }
@@ -483,22 +503,18 @@ void MQTTManager::handleConfigTimerIrrigation(const JsonDocument& doc) {
 // Topic: greenhouse/config/mix_schedule_ext
 // Payload contoh:
 // {
-//   "mix_interval_days":    3,
-//   "per_plant_need_liter": 0.5,
 //   "stir_evening_hour":    18,
 //   "stir_evening_minute":  0,
 //   "stir_duration_seconds": 300
 // }
+// Field lama "mix_interval_days" dan "per_plant_need_liter" diabaikan dengan aman.
 // =========================================
 void MQTTManager::handleConfigMixScheduleExt(const JsonDocument& doc) {
-    uint16_t intervalDays = doc["mix_interval_days"]    | configManager.getMixIntervalDays();
-    float    perPlant     = doc["per_plant_need_liter"] | configManager.getPerPlantNeedLiter();
-    uint8_t  stirEvHour   = doc["stir_evening_hour"]    | configManager.getStirEveningHour();
-    uint8_t  stirEvMin    = doc["stir_evening_minute"]  | configManager.getStirEveningMinute();
-    uint32_t stirDurSec   = doc["stir_duration_seconds"]| (uint32_t)(configManager.getStirDurationMs() / 1000UL);
+    uint8_t  stirEvHour = doc["stir_evening_hour"]     | configManager.getStirEveningHour();
+    uint8_t  stirEvMin  = doc["stir_evening_minute"]   | configManager.getStirEveningMinute();
+    uint32_t stirDurSec = doc["stir_duration_seconds"] | (uint32_t)(configManager.getStirDurationMs() / 1000UL);
 
-    configManager.setMixScheduleExt(intervalDays, perPlant, stirEvHour, stirEvMin,
-                                    stirDurSec * 1000UL);
+    configManager.setStirSchedule(stirEvHour, stirEvMin, stirDurSec * 1000UL);
     publishConfigAck("mix_schedule_ext", true);
 }
 
@@ -511,19 +527,24 @@ void MQTTManager::handleSoilResetMode(const String& payload) {
 }
 
 // =========================================
-// publishTankLowAlert()
+// publishNeedRefillAlert()
+// Dipanggil dari update() saat FSM set _needRefillAlertPending di FILL_WATER.
 // =========================================
-void MQTTManager::publishTankLowAlert(float deficitLiter) {
+void MQTTManager::publishNeedRefillAlert(float deficitLiter) {
     JsonDocument doc;
-    doc["device_id"]     = MQTT_CLIENT_ID;
-    doc["deficit_liter"] = round(deficitLiter * 100.0f) / 100.0f;
-    doc["timestamp"]     = millis();
+    doc["device_id"]      = MQTT_CLIENT_ID;
+    doc["status"]         = "waiting_fill";
+    doc["tank_volume"]    = round(waterLevel.getVolumeLiter() * 10.0f) / 10.0f;
+    doc["target_volume"]  = round(configManager.getTargetFillVolume() * 10.0f) / 10.0f;
+    doc["deficit_liter"]  = round(deficitLiter * 100.0f) / 100.0f;
+    doc["timestamp"]      = millis();
 
-    char buf[128];
+    char buf[192];
     serializeJson(doc, buf);
     mqttClient.publish(TOPIC_ALERT_TANK_LOW, buf, false);
 
-    Serial.printf("[MQTT] Tank LOW alert published: deficit=%.2fL\n", deficitLiter);
+    Serial.printf("[MQTT] Need-refill alert: tank=%.1fL, target=%.1fL, kurang=%.2fL\n",
+                  waterLevel.getVolumeLiter(), configManager.getTargetFillVolume(), deficitLiter);
 }
 
 // =========================================

@@ -39,12 +39,12 @@ public:
     FertigationState getState() const;
     ErrorCode        getError() const;
 
-    // --- Tank-low alert polling (untuk MQTTManager) ---
-    // Pola: MQTTManager memanggil isTankLowAlertPending() tiap update(),
-    // publish ke MQTT, lalu clearTankLowAlert() agar tidak re-publish.
-    bool  isTankLowAlertPending() const { return _tankLowAlertPending; }
-    float getTankLowDeficit()     const { return _tankLowDeficit; }
-    void  clearTankLowAlert()           { _tankLowAlertPending = false; }
+    // --- Need-refill alert polling (untuk MQTTManager) ---
+    // Dipicu dari handleFillWater() selama tankVolume < targetFillVolume.
+    // MQTTManager poll tiap update(), publish, lalu clearNeedRefillAlert().
+    bool  isNeedRefillAlertPending() const { return _needRefillAlertPending; }
+    float getRefillDeficit()         const { return _refillDeficit; }
+    void  clearNeedRefillAlert()           { _needRefillAlertPending = false; }
 
 private:
     void changeState(
@@ -54,10 +54,6 @@ private:
     // --- Condition helpers ---
     bool isTankSafeForMixing();
     bool isPPMInRange();
-    // Menggantikan isTodayAlreadyMixed() — cek apakah sudah waktunya mixing
-    // berdasarkan selisih hari (rtcManager.getPlantAgeDays() - lastMixDay) >= mixIntervalDays.
-    // Dengan mixIntervalDays=1 (default), perilaku identik dengan sebelumnya.
-    bool isMixDue();
     bool isStateTimeout(unsigned long timeout);
 
     // --- Actuator helpers ---
@@ -161,7 +157,7 @@ private:
     // --- Log helpers ---
     void logStateTransition(FertigationState newState);
     void logStateAction(const char* message);
-    void logRecipe(float remainingVolume, float ratio);
+    void logRecipe();
     void logError();
     void logError(const char* message);
     void logRecovery(const char* message);
@@ -178,7 +174,6 @@ private:
 
     bool stateInitialized;
 
-    float targetWaterVolume;
     float targetNutrientA;
     float targetNutrientB;
 
@@ -237,10 +232,13 @@ private:
     bool          _stirring           = false;   // apakah stirrer sedang aktif
     unsigned long _stirStartMs        = 0;       // kapan stirrer dinyalakan
 
-    // --- Tank-low blocking state ---
-    bool          _tankLowBlocked     = false;   // flag irigasi diblokir karena tank < minimum
-    float         _tankLowDeficit     = 0.0f;    // kekurangan liter terakhir (untuk publish MQTT)
-    bool          _tankLowAlertPending = false;  // flag agar MQTTManager bisa poll dan publish
+    // --- Safety guard state (checkMinimumWater Opsi A) ---
+    bool          _tankLowBlocked     = false;   // flag irigasi diblokir karena tank < safety floor
+
+    // --- Need-refill alert state (FILL_WATER waiting for target) ---
+    float         _refillDeficit         = 0.0f;    // kekurangan liter (untuk payload MQTT alert)
+    bool          _needRefillAlertPending = false;  // flag agar MQTTManager bisa poll dan publish
+    unsigned long _lastRefillAlertMs      = 0;      // timestamp pengiriman alert terakhir (rate-limiter)
 
     // --- Timer Fallback Irrigation state ---
     // Flag: set true pada frame pertama setelah IRRIGATION selesai

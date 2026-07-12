@@ -16,10 +16,7 @@
 #include "../fsm/SoilHealthMonitor.h"
 #include "../fsm/FertigationFSM.h"
 
-// =========================================
-// WIFI & MQTT — isi sesuai environment kamu
-// =========================================
-#include "WiFiCredentials.h"
+// WiFi dikonfigurasi via captive portal (WiFiManager) — tidak ada kredensial hardcoded
 
 #define MQTT_BROKER    "aead004bf5144152b88233f1a1949418.s1.eu.hivemq.cloud"
 #define MQTT_PORT      8883
@@ -79,8 +76,8 @@ public:
     // Publish status kesehatan sensor tanah + mode irigasi
     void publishSoilHealth();
 
-    // Publish alert tank low (dipanggil dari update() saat FSM set flag)
-    void publishTankLowAlert(float deficitLiter);
+    // Publish alert "butuh diisi" (dipanggil dari update() saat FSM set flag di FILL_WATER)
+    void publishNeedRefillAlert(float deficitLiter);
 
     // Cek apakah ada command masuk dari dashboard
     bool hasCommand() const;

@@ -23,9 +23,7 @@ enum class ErrorCode {
 
     WATER_OVERFLOW,          // overflow warning (non-fatal: FSM tetap jalan, auto-clear saat volume turun)
 
-    RECIPE_PH_CONFLICT,      // fatal: rentang pH antar-hari dalam grup N-hari tidak overlap, mixing dibatalkan
-
-    TANK_LOW                 // non-fatal warning: volume tangki < minimum dinamis, irigasi diblokir sampai air cukup
+    WAITING_FOR_FILL         // non-fatal warning: tangki di bawah target isi / safety floor — irigasi diblokir
 };
 
 #endif

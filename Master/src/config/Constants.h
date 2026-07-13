@@ -17,21 +17,29 @@ constexpr uint32_t PRE_MIX_CORRECTION_TIME = 5000UL;    // 5 detik (uji coba)
 constexpr uint32_t MIX_A_TIME              = 10000UL;   // 10 detik (uji coba)
 constexpr uint32_t MIX_B_TIME              = 10000UL;   // 10 detik (uji coba)
 
-constexpr unsigned long WATER_FILL_TIMEOUT  = 1800000UL; // 30 menit
 constexpr unsigned long NUTRIENT_TIMEOUT    = 300000UL;  // 5 menit
 constexpr unsigned long CORRECTION_MIX_TIME = 60000UL;  // 1 menit
 constexpr uint32_t      PRE_IRRIGATION_MIX_TIME = 60000UL; // 1 menit
 constexpr uint32_t      CORRECTION_DELAY    = 180000UL; // 3 menit
 
-// --- Pengisian air manual (FILL_WATER) ---
+// --- Pengisian air otomatis via solenoid (FILL_WATER) ---
+// Timeout pengisian air otomatis — lebih pendek dari mode manual karena debit keran
+// bertekanan tetap dan predictable. Jika dalam waktu ini level belum tercapai,
+// kemungkinan ada fault hardware (solenoid macet, keran mati, sensor gagal baca).
+constexpr unsigned long WATER_FILL_TIMEOUT  = 300000UL;  // 5 menit
 // Toleransi noise sensor ultrasonik — perubahan di bawah nilai ini dianggap noise, bukan gerakan level nyata
 constexpr float          WATER_LEVEL_NOISE_THRESHOLD  = 0.1f;     // liter
-// Durasi level harus stabil (tidak berubah) setelah buzzer ON sebelum FSM lanjut ke PRE_MIX_A
+// Durasi level harus stabil (tidak berubah) setelah solenoid TUTUP sebelum FSM lanjut ke PRE_MIX_A
 constexpr unsigned long  WATER_LEVEL_STABLE_TIMEOUT   = 60000UL;  // 1 menit
 // Volume minimum tangki (safety floor) untuk proteksi pompa dari dry-run (checkMinimumWater Opsi A)
 constexpr float          TANK_SAFETY_FLOOR_LITER       = 5.0f;
 // Interval pengiriman ulang alert "butuh diisi" ke MQTT selama menunggu di FILL_WATER
 constexpr unsigned long  NEED_REFILL_ALERT_INTERVAL_MS = 30000UL; // 30 detik
+// Margin penutupan solenoid lebih awal sebelum target volume tercapai.
+// Kompensasi delay mekanik penutupan valve + sisa air di pipa yang masih mengalir
+// sesaat setelah solenoid menutup (water hammer / trailing flow).
+// WAJIB dikalibrasi ulang di lapangan — lihat catatan kalibrasi di FertigationFSM.cpp.
+constexpr float          FILL_STOP_MARGIN_LITER        = 0.3f;    // estimasi awal, kalibrasi sebelum produksi
 
 // =========================================
 // Soil Health Monitor

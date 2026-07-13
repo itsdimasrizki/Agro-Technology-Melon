@@ -24,7 +24,7 @@ uint8_t RelayManager::getPin(RelayChannel relay) {
             return RELAY_3_PIN;
         case RELAY_SOLENOID_IRRIG:  
             return RELAY_4_PIN;
-        case RELAY_BUZZER:             // ch5
+        case RELAY_SOLENOID_WATER:        // ch5 — solenoid air + buzzer (parallel)
             return RELAY_5_PIN;
         case RELAY_PUMP_A:           
             return RELAY_6_PIN;
@@ -50,7 +50,7 @@ void RelayManager::allOff() {
     off(RELAY_SOLENOID_A);
     off(RELAY_SOLENOID_B);
     off(RELAY_SOLENOID_IRRIG);
-    off(RELAY_BUZZER);
+    off(RELAY_SOLENOID_WATER);
     off(RELAY_PUMP_A);
     off(RELAY_PUMP_B);
     off(RELAY_PUMP_MIX);

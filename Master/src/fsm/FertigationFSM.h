@@ -60,8 +60,11 @@ private:
     void startMixer();
     void stopMixer();
 
-    void startBuzzer();
-    void stopBuzzer();
+    // Kontrol solenoid valve pengisian air (RELAY_SOLENOID_WATER, ch5).
+    // Solenoid tipe NC (Normally Closed) — aman jika device mati/hang, air berhenti sendiri.
+    // Buzzer di-wire paralel ke relay yang sama — ON solenoid = buzzer bunyi otomatis.
+    void startWaterFillSolenoid();
+    void stopWaterFillSolenoid();
     void startFillStirrer();
     void stopFillStirrer();
 
@@ -220,9 +223,10 @@ private:
     // Digunakan oleh gotoPostCorrection() untuk kembali ke validate yang benar
     FertigationState correctionOrigin = FertigationState::VALIDATE;
 
-    // State variables untuk deteksi level stabil pada pengisian air manual (FILL_WATER)
+    // State variables untuk deteksi level stabil pada pengisian air otomatis (FILL_WATER)
     float         lastTankVolume      = -1.0f;
     unsigned long lastLevelChangeTime = 0;
+    bool          _solenoidWaterOpen  = false;  // apakah solenoid air sedang terbuka
 
     // --- Stirring & Daily-check state ---
     // Hari terakhir refreshDailyChecks() dijalankan (cegah re-run pada tick yang sama)

@@ -28,7 +28,11 @@ float WaterLevel::getDistanceCM() {
     if(duration <= 0)
         return -1;
 
-    return duration * 0.0343f / 2.0f;
+    float raw = duration * 0.0343f / 2.0f;
+
+    // Proses melalui median filter N=7 untuk meredam noise saat permukaan bergolak.
+    // Filter ini aktif terus-menerus dan aman digunakan di semua kondisi.
+    return _distanceFilter.process(raw);
 }
 
 float WaterLevel::getLevelPercent() {

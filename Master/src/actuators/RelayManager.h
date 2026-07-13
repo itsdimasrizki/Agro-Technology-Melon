@@ -8,7 +8,10 @@ enum RelayChannel {
     RELAY_SOLENOID_A,
     RELAY_SOLENOID_B,
     RELAY_SOLENOID_IRRIG,
-    RELAY_BUZZER,              // ch5 — buzzer sinyal operator (sebelumnya: RELAY_PUMP_WATER)
+    RELAY_SOLENOID_WATER,     // ch5 — solenoid valve pengisian air (NC: default TUTUP tanpa daya)
+                               //        Buzzer di-wire paralel ke output relay ini — setiap kali
+                               //        solenoid di-energize (ON), buzzer otomatis ikut bunyi
+                               //        sebagai indikator audible pengisian sedang berlangsung.
     RELAY_PUMP_A,
     RELAY_PUMP_B,
     RELAY_PUMP_MIX

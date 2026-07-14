@@ -14,12 +14,14 @@ public:
 
         if(index >= N) index = 0;
 
+        if (sampleCount < N) sampleCount++;
+
         T sorted[N];
 
-        memcpy(sorted, buffer, sizeof(buffer));
+        memcpy(sorted, buffer, sizeof(T) * sampleCount);
 
-        for (size_t i = 0; i < N - 1; i++) {
-            for (size_t j = i + 1; j < N; j++) {
+        for (size_t i = 0; i < sampleCount - 1; i++) {
+            for (size_t j = i + 1; j < sampleCount; j++) {
                 if (sorted[i] > sorted[j]) {
                     T temp = sorted[i];
                     sorted[i] = sorted[j];
@@ -28,13 +30,14 @@ public:
             }
         }
 
-        return sorted[N / 2];
+        return sorted[sampleCount / 2];
     }
 
 private:
     T buffer[N] = {};
 
     size_t index = 0;
+    size_t sampleCount = 0;
 };
 
 #endif

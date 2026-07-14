@@ -2,6 +2,7 @@
 #define WATER_LEVEL_H
 
 #include <Arduino.h>
+#include "MedianFilter.h"
 
 class WaterLevel {
 public:
@@ -23,6 +24,9 @@ private:
 
     uint8_t _trigPin;
     uint8_t _echoPin;
+
+    // Median 7 sampel meredam noise/echo saat permukaan air bergolak.
+    MedianFilter<float, 7> _distanceFilter;
 
     float tankHeightCM      = 45.0f;
     float tankCapacityLiter = 15.0f;

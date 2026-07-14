@@ -1,4 +1,5 @@
 #include "MQTTManager.h"
+#include "../config/PinConfig.h"
 
 // Static member definitions
 String       MQTTManager::incomingCommand = "";
@@ -143,7 +144,7 @@ void MQTTManager::publishRelayStatus() {
     doc["timestamp"] = millis();
 
     JsonObject relays = doc["relays"].to<JsonObject>();
-    relays["water"]      = (digitalRead(21) == LOW);
+    relays["water"]      = (digitalRead(RELAY_5_PIN) == LOW);
     relays["nutrient_a"] = (digitalRead(38) == LOW);
     relays["nutrient_b"] = (digitalRead(39) == LOW);
     relays["irrigation"] = (digitalRead(40) == LOW);

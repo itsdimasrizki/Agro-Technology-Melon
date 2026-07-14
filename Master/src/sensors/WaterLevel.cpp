@@ -28,7 +28,8 @@ float WaterLevel::getDistanceCM() {
     if(duration <= 0)
         return -1;
 
-    return duration * 0.0343f / 2.0f;
+    float distance = duration * 0.0343f / 2.0f;
+    return _distanceFilter.process(distance);
 }
 
 float WaterLevel::getLevelPercent() {

@@ -8,7 +8,9 @@ enum RelayChannel {
     RELAY_SOLENOID_A,
     RELAY_SOLENOID_B,
     RELAY_SOLENOID_IRRIG,
-    RELAY_BUZZER,              // ch5 — buzzer sinyal operator (sebelumnya: RELAY_PUMP_WATER)
+    // ch5 — solenoid air pengisian + buzzer, dipasang paralel pada output relay yang sama.
+    // Solenoid harus tipe Normally Closed (NC) agar aliran air berhenti saat relay/device tidak bertenaga.
+    RELAY_SOLENOID_WATER,
     RELAY_PUMP_A,
     RELAY_PUMP_B,
     RELAY_PUMP_MIX

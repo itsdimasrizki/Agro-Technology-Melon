@@ -5,6 +5,6 @@
 
 // Set true untuk skip jadwal harian dan langsung mix saat startup (mode testing)
 // Set false untuk production — sistem menunggu jadwal jam DAILY_MIX_HOUR
-#define SKIP_DAILY_SCHEDULE false
+#define SKIP_DAILY_SCHEDULE true
 
 #endif

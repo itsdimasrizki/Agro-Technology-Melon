@@ -3,6 +3,7 @@
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <WiFiManager.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
@@ -15,11 +16,6 @@
 #include "../utils/ErrorCode.h"
 #include "../fsm/SoilHealthMonitor.h"
 #include "../fsm/FertigationFSM.h"
-
-// =========================================
-// WIFI & MQTT — isi sesuai environment kamu
-// =========================================
-#include "WiFiCredentials.h"
 
 #define MQTT_BROKER    "aead004bf5144152b88233f1a1949418.s1.eu.hivemq.cloud"
 #define MQTT_PORT      8883
@@ -129,6 +125,7 @@ private:
 
     unsigned long lastPublish = 0;
     unsigned long lastSoilPublish = 0;
+    unsigned long lastWiFiRetry = 0;
     FertigationState lastFSMState = FertigationState::IDLE;
     IrrigationMode lastIrrigMode = IrrigationMode::HUMIDITY;
 

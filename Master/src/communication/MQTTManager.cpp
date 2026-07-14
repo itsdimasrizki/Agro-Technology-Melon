@@ -44,6 +44,13 @@ void MQTTManager::update(
     FertigationState fsmState,
     ErrorCode errorCode
 ) {
+    connectWiFi();
+
+    // MQTT tidak boleh mencoba konek jika Wi-Fi belum tersambung.
+    if (WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
     if (!mqttClient.connected()) {
         connectMQTT();
     }
@@ -350,23 +357,46 @@ void MQTTManager::handleConfigSchedule(const JsonDocument& doc) {
 void MQTTManager::connectWiFi() {
     if (WiFi.status() == WL_CONNECTED) return;
 
-    Serial.print("[WiFi] Connecting to ");
-    Serial.print(WIFI_SSID);
+    // Pada boot pertama (atau saat Wi-Fi sebelumnya tidak tersedia),
+    // WiFiManager menampilkan captive portal di hotspot ini. Kredensial
+    // yang dipilih dari HP disimpan aman di NVS oleh library.
+    static bool provisioned = false;
+    if (!provisioned) {
+        WiFiManager wifiManager;
+        wifiManager.setTitle("Melon Master Wi-Fi");
+        wifiManager.setCustomHeadElement(R"rawliteral(
+<style>
+  :root { color-scheme: light; }
+  body { background:#f6fff8 !important; color:#174d2b !important; font-family:Arial,sans-serif !important; }
+  h1, h2 { color:#16803b !important; }
+  button, input[type=submit] { background:#16803b !important; border-radius:8px !important; color:#fff !important; }
+  input, select { border:1px solid #79bd8d !important; border-radius:7px !important; }
+  .msg { border-color:#79bd8d !important; }
+</style>)rawliteral");
 
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+        Serial.println("[WiFi] Membuka portal konfigurasi: MelonMaster-Setup");
+        Serial.println("[WiFi] Hubungkan HP ke hotspot tersebut (password: Melon123), lalu buka 192.168.4.1.");
 
-    uint8_t attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-        delay(500);
-        Serial.print(".");
-        attempts++;
+        // Fungsi ini otomatis memakai jaringan yang tersimpan. Jika gagal,
+        // hotspot captive portal dibuat sehingga konfigurasi tidak perlu di-hardcode.
+        if (!wifiManager.autoConnect("MelonMaster-Setup", "Melon123")) {
+            Serial.println("[WiFi] Portal ditutup tanpa koneksi; restart untuk mencoba lagi.");
+            return;
+        }
+
+        provisioned = true;
+        Serial.print("[WiFi] Connected, IP: ");
+        Serial.println(WiFi.localIP());
+        return;
     }
 
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.print("\n[WiFi] Connected, IP: ");
-        Serial.println(WiFi.localIP());
-    } else {
-        Serial.println("\n[WiFi] Failed — will retry next update()");
+    // Setelah konfigurasi awal, reconnect berjalan non-blocking agar loop
+    // pengendalian fertigation tidak tertahan bila router sedang mati.
+    const unsigned long now = millis();
+    if (now - lastWiFiRetry >= 10000UL) {
+        lastWiFiRetry = now;
+        Serial.println("[WiFi] Koneksi terputus, mencoba reconnect...");
+        WiFi.reconnect();
     }
 }
 
@@ -374,6 +404,7 @@ void MQTTManager::connectWiFi() {
 // connectMQTT()
 // =========================================
 void MQTTManager::connectMQTT() {
+    if (WiFi.status() != WL_CONNECTED) return;
     if (mqttClient.connected()) return;
 
     wifiClient.setInsecure();

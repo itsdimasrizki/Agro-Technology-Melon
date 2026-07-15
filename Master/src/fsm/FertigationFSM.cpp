@@ -231,12 +231,12 @@ void FertigationFSM::stopMixer() {
     relayManager.off(RELAY_PUMP_MIX);
 }
 
-void FertigationFSM::startBuzzer() {
-    relayManager.on(RELAY_BUZZER);
+void FertigationFSM::openWaterInlet() {
+    relayManager.on(RELAY_WATER_INLET);
 }
 
-void FertigationFSM::stopBuzzer() {
-    relayManager.off(RELAY_BUZZER);
+void FertigationFSM::closeWaterInlet() {
+    relayManager.off(RELAY_WATER_INLET);
 }
 
 void FertigationFSM::startFillStirrer() {
@@ -584,7 +584,7 @@ void FertigationFSM::handleWaitDailyMix() {
 }
 
 void FertigationFSM::handlePrepareDailyMix() {
-    // Reset flow meter dan tunggu pengisian air manual di FILL_WATER.
+    // Reset flow meter dan mulai pengisian air otomatis di FILL_WATER.
     // prepareDailyRecipe() dipanggil setelah tangki penuh (di akhir handleFillWater()).
     nutrientAFlow.reset();
     nutrientBFlow.reset();
@@ -594,18 +594,34 @@ void FertigationFSM::handlePrepareDailyMix() {
 
 void FertigationFSM::handleFillWater() {
     if (isStateTimeout(WATER_FILL_TIMEOUT)) {
+        closeWaterInlet();
         gotoError(ErrorCode::WATER_TIMEOUT);
+        return;
+    }
+
+    if (sensor.tankVolume < 0.0f) {
+        closeWaterInlet();
+        gotoError(ErrorCode::ULTRASONIC_FAILURE);
         return;
     }
 
     if (!stateInitialized) {
         consumeRecovery();
         lastTankVolume      = sensor.tankVolume;
+        _fillStartVolume    = sensor.tankVolume;
         lastLevelChangeTime = millis();
         _lastRefillAlertMs  = 0;  // paksa kirim alert segera
         startFillStirrer();
+        if (sensor.tankVolume < configManager.getTargetFillVolume()) {
+            openWaterInlet();
+        } else {
+            closeWaterInlet();
+        }
         stateInitialized = true;
-        logStateAction("[FSM] Menunggu pengisian air manual...");
+        Serial.printf("[FSM] Fill water otomatis: start=%.1fL, target=%.1fL, perlu=%.1fL\n",
+                      _fillStartVolume,
+                      configManager.getTargetFillVolume(),
+                      max(0.0f, configManager.getTargetFillVolume() - _fillStartVolume));
     }
 
     // Deteksi perubahan level yang nyata (di atas threshold noise ultrasonik)
@@ -614,32 +630,41 @@ void FertigationFSM::handleFillWater() {
         lastLevelChangeTime = millis();
     }
 
-    // Overflow: warning non-fatal — FSM tetap jalan, tidak masuk ERROR
+    // Overflow: warning non-fatal. Solenoid inlet wajib tutup, tetapi proses tetap
+    // lanjut setelah level stabil karena volume aktual masih bisa divalidasi PPM.
     if (sensor.tankVolume > configManager.getTankCapacityLiter()) {
+        closeWaterInlet();
         setWarning(ErrorCode::WATER_OVERFLOW);
+        Serial.printf("[FSM] WATER_OVERFLOW: vol=%.1fL > cap=%.1fL — solenoid inlet ditutup\n",
+                      sensor.tankVolume, configManager.getTankCapacityLiter());
     } else if (currentError == ErrorCode::WATER_OVERFLOW) {
         clearWarning();
     }
 
-    // Buzzer ON saat target tercapai; mati sendiri setelah level stabil >= WATER_LEVEL_STABLE_TIMEOUT
-    if (sensor.tankVolume >= configManager.getTargetFillVolume()) {
-        startBuzzer();
+    // Solenoid NC dibuka selama volume belum mencapai target. Saat target tercapai,
+    // solenoid ditutup dan sistem menunggu level stabil sebentar sebelum lanjut nutrisi.
+    if (sensor.tankVolume >= configManager.getTargetFillVolume() ||
+        sensor.tankVolume > configManager.getTankCapacityLiter()) {
+        closeWaterInlet();
         if (millis() - lastLevelChangeTime >= WATER_LEVEL_STABLE_TIMEOUT) {
-            stopBuzzer();
             stopFillStirrer();
             // Hitung dosis nutrisi SETELAH tangki penuh — full dose, tanpa scaling rasio
             prepareDailyRecipe();
             changeState(FertigationState::PRE_MIX_A);
         }
     } else {
-        stopBuzzer();
-        // Kirim alert "butuh diisi" ke MQTT secara periodik selama menunggu
+        openWaterInlet();
+        // Kirim progress fill ke MQTT secara periodik selama pengisian
         if (millis() - _lastRefillAlertMs >= NEED_REFILL_ALERT_INTERVAL_MS) {
             _lastRefillAlertMs        = millis();
             _refillDeficit            = configManager.getTargetFillVolume() - sensor.tankVolume;
             _needRefillAlertPending   = true;
-            Serial.printf("[FSM] Menunggu pengisian: vol=%.1fL, target=%.1fL, kurang=%.1fL\n",
-                          sensor.tankVolume, configManager.getTargetFillVolume(), _refillDeficit);
+            Serial.printf("[FSM] Filling: start=%.1fL, now=%.1fL, target=%.1fL, filled=%.1fL, remaining=%.1fL\n",
+                          _fillStartVolume,
+                          sensor.tankVolume,
+                          configManager.getTargetFillVolume(),
+                          sensor.tankVolume - _fillStartVolume,
+                          _refillDeficit);
         }
     }
 }
@@ -1117,9 +1142,9 @@ void FertigationFSM::logRecovery(
 //      v
 // FILL_WATER
 //      | sensor.tankVolume >= configManager.getTargetFillVolume()
-//      |   → buzzer ON
+//      |   → solenoid inlet OFF
 //      |   → level stabil (tidak berubah >= WATER_LEVEL_STABLE_TIMEOUT)
-//      |   → buzzer OFF, stirrer OFF
+//      |   → stirrer OFF
 //      v
 // PRE_MIX_A
 //      |

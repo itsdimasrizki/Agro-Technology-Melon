@@ -47,6 +47,8 @@ void ConfigManager::applyDefaults() {
     _maxConsumptionPerPlant = 0.0f;
     _targetFillVolume       = 0.0f;
     _tankCapacityLiter      = 0.0f;
+    _tankHeightCM           = 0.0f;
+    _tankDiameterCM         = 0.0f;
 
     _plantYear      = 0;
     _plantMonth     = 0;
@@ -111,6 +113,8 @@ void ConfigManager::loadFromNVS() {
     _maxConsumptionPerPlant = _prefs.getFloat("maxCons",  _maxConsumptionPerPlant);
     _targetFillVolume       = _prefs.getFloat("dayVol",   _targetFillVolume);
     _tankCapacityLiter      = _prefs.getFloat("tankCap",  _tankCapacityLiter);
+    _tankHeightCM           = _prefs.getFloat("tankHcm",  _tankHeightCM);
+    _tankDiameterCM         = _prefs.getFloat("tankDcm",  _tankDiameterCM);
     _prefs.end();
 
     // Schedule
@@ -178,6 +182,8 @@ void ConfigManager::saveAll() {
     _prefs.putFloat("maxCons",  _maxConsumptionPerPlant);
     _prefs.putFloat("dayVol",   _targetFillVolume);
     _prefs.putFloat("tankCap",  _tankCapacityLiter);
+    _prefs.putFloat("tankHcm",  _tankHeightCM);
+    _prefs.putFloat("tankDcm",  _tankDiameterCM);
     _prefs.end();
 
     // Schedule
@@ -272,14 +278,17 @@ void ConfigManager::setIrrigationStages(const IrrigationStageConfig* stages, uin
 }
 
 void ConfigManager::setSystemConfig(uint16_t plants, float maxConsumption,
-                                    float targetFillVolume, float tankCapacity) {
+                                    float targetFillVolume, float tankCapacity,
+                                    float tankHeightCM, float tankDiameterCM) {
     _totalPlants            = plants;
     _maxConsumptionPerPlant = maxConsumption;
     _targetFillVolume       = targetFillVolume;
     _tankCapacityLiter      = tankCapacity;
+    _tankHeightCM           = tankHeightCM;
+    _tankDiameterCM         = tankDiameterCM;
     saveAll();
-    Serial.printf("[CFG] System updated: plants=%d, targetFillVol=%.2fL, tankCap=%.2fL\n",
-                  plants, targetFillVolume, tankCapacity);
+    Serial.printf("[CFG] System updated: plants=%d, targetFillVol=%.2fL, tankCap=%.2fL, tankHeight=%.1fcm, tankDiameter=%.1fcm\n",
+                  plants, targetFillVolume, tankCapacity, tankHeightCM, tankDiameterCM);
 }
 
 void ConfigManager::setScheduleConfig(uint16_t year, uint8_t month, uint8_t day,

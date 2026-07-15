@@ -137,6 +137,8 @@ void setup() {
     Serial.println("[5] WaterLevel...");
     waterLevel.begin();
     waterLevel.setTankCapacity(configManager.getTankCapacityLiter());
+    waterLevel.setTankHeight(configManager.getTankHeightCM());
+    waterLevel.setTankDiameter(configManager.getTankDiameterCM());
 
     Serial.println("[6] WaterTemp...");
     waterTemp.begin();
@@ -207,7 +209,7 @@ void loop() {
         Serial.print("PPM : ");
         Serial.println(data.ppm);
 
-        Serial.print("Water : ");
+        Serial.print("Water Volume (L) : ");
         Serial.println(data.waterLevel);
 
         Serial.print("Soil : ");

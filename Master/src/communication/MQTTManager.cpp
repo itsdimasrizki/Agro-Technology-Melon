@@ -1,5 +1,6 @@
 #include "MQTTManager.h"
 #include <WiFiManager.h>
+#include "../config/PinConfig.h"
 
 // Static member definitions
 String       MQTTManager::incomingCommand = "";
@@ -93,7 +94,7 @@ void MQTTManager::publishSensors(const SensorData& data) {
     sensors["ph"]          = round(data.ph * 100.0f) / 100.0f;
     sensors["ppm"]         = (int)data.ppm;
     sensors["temperature"] = round(data.temperature * 10.0f) / 10.0f;
-    sensors["water_level"] = round(data.waterLevel * 10.0f) / 10.0f;
+    sensors["water_level"] = round(data.waterLevel * 10.0f) / 10.0f; // liter, bukan cm/persen
     sensors["tank_volume"] = round(data.tankVolume * 10.0f) / 10.0f;
     sensors["soil_adc"]    = data.soilADC;
 
@@ -101,6 +102,22 @@ void MQTTManager::publishSensors(const SensorData& data) {
     flow["water"] = round(data.flowWater * 100.0f) / 100.0f;
     flow["a"]     = round(data.flowA * 100.0f) / 100.0f;
     flow["b"]     = round(data.flowB * 100.0f) / 100.0f;
+
+    if (fsm.getState() == FertigationState::FILL_WATER) {
+        JsonObject fill = doc["fill_progress"].to<JsonObject>();
+        float target = configManager.getTargetFillVolume();
+        float current = data.tankVolume;
+        float remaining = target - current;
+        if (remaining < 0.0f) remaining = 0.0f;
+
+        fill["status"] = (current >= target) ? "target_reached" : "filling";
+        fill["current_liter"] = round(current * 10.0f) / 10.0f;
+        fill["target_liter"] = round(target * 10.0f) / 10.0f;
+        float filled = current - fsm.getFillStartVolume();
+        if (filled < 0.0f) filled = 0.0f;
+        fill["filled_liter"] = round(filled * 10.0f) / 10.0f;
+        fill["remaining_liter"] = round(remaining * 10.0f) / 10.0f;
+    }
 
     char buf[384];
     serializeJson(doc, buf);
@@ -144,10 +161,11 @@ void MQTTManager::publishRelayStatus() {
     doc["timestamp"] = millis();
 
     JsonObject relays = doc["relays"].to<JsonObject>();
-    relays["water"]      = (digitalRead(21) == LOW);
-    relays["nutrient_a"] = (digitalRead(38) == LOW);
-    relays["nutrient_b"] = (digitalRead(39) == LOW);
-    relays["irrigation"] = (digitalRead(40) == LOW);
+    relays["water_inlet"] = (digitalRead(RELAY_5_PIN) == LOW);
+    relays["stirrer"]     = (digitalRead(RELAY_1_PIN) == LOW);
+    relays["nutrient_a"]  = (digitalRead(RELAY_2_PIN) == LOW);
+    relays["nutrient_b"]  = (digitalRead(RELAY_3_PIN) == LOW);
+    relays["irrigation"]  = (digitalRead(RELAY_4_PIN) == LOW);
 
     char buf[192];
     serializeJson(doc, buf);
@@ -216,8 +234,16 @@ void MQTTManager::onMessage(
 // configManager, rtcManager, waterLevel
 // =========================================
 void MQTTManager::handleMessage(const char* topic, const String& payload) {
-    // Command relay
+    // Command fertigasi/aktuator hanya diterima saat larutan sudah READY.
+    // Sebelum READY, command diabaikan agar tidak ada irigasi saat air/nutrisi belum valid.
     if (String(topic) == TOPIC_CMD) {
+        if (fsm.getState() != FertigationState::READY) {
+            Serial.printf("[MQTT] Command ignored: FSM not READY (state=%s)\n",
+                          stateToString(fsm.getState()));
+            publishConfigAck("actuators_cmd_not_ready", false);
+            return;
+        }
+
         incomingCommand = payload;
         commandFlag     = true;
         return;
@@ -319,11 +345,18 @@ void MQTTManager::handleConfigSystem(const JsonDocument& doc) {
     float    maxCons     = doc["max_consumption_per_plant"] | configManager.getMaxConsumptionPerPlant();
     float    targetFill  = doc["target_fill_volume"]        | configManager.getTargetFillVolume();
     float    tankCap     = doc["tank_capacity_liter"]       | configManager.getTankCapacityLiter();
+    float    tankHeight  = doc["tank_height_cm"]            | configManager.getTankHeightCM();
+    float    tankDiam    = doc["tank_diameter_cm"]          | configManager.getTankDiameterCM();
+    if (tankHeight <= 0.0f) tankHeight = 45.0f;
+    if (tankDiam <= 0.0f) tankDiam = 20.6f;
+    if (tankCap > 0.0f && targetFill > tankCap) targetFill = tankCap;
 
-    configManager.setSystemConfig(plants, maxCons, targetFill, tankCap);
+    configManager.setSystemConfig(plants, maxCons, targetFill, tankCap, tankHeight, tankDiam);
 
     // Propagate ke WaterLevel sensor langsung
     waterLevel.setTankCapacity(tankCap);
+    waterLevel.setTankHeight(tankHeight);
+    waterLevel.setTankDiameter(tankDiam);
 
     publishConfigAck("system", true);
 }
@@ -533,7 +566,9 @@ void MQTTManager::handleSoilResetMode(const String& payload) {
 void MQTTManager::publishNeedRefillAlert(float deficitLiter) {
     JsonDocument doc;
     doc["device_id"]      = MQTT_CLIENT_ID;
-    doc["status"]         = "waiting_fill";
+    doc["status"]         = (waterLevel.getVolumeLiter() >= configManager.getTargetFillVolume())
+                                ? "target_reached"
+                                : "filling";
     doc["tank_volume"]    = round(waterLevel.getVolumeLiter() * 10.0f) / 10.0f;
     doc["target_volume"]  = round(configManager.getTargetFillVolume() * 10.0f) / 10.0f;
     doc["deficit_liter"]  = round(deficitLiter * 100.0f) / 100.0f;

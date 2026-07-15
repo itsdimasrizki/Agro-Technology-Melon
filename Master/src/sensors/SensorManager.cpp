@@ -76,8 +76,8 @@ void SensorManager::update() {
     }
 
     if (now - _lastLevelUpdate >= 100UL) {
-        data.waterLevel  = levelSensor.getLevelPercent();
         data.tankVolume  = levelSensor.getVolumeLiter();
+        data.waterLevel  = data.tankVolume;
         _lastLevelUpdate = now;
     }
 

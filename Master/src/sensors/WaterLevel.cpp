@@ -32,6 +32,9 @@ float WaterLevel::getDistanceCM() {
 }
 
 float WaterLevel::getLevelPercent() {
+    if (tankHeightCM <= 0.0f)
+        return -1;
+
     float distance =
         getDistanceCM();
 
@@ -46,10 +49,23 @@ float WaterLevel::getLevelPercent() {
 }
 
 float WaterLevel::getVolumeLiter() {
-    float level = getLevelPercent();
-
-    if(level < 0)
+    if (tankHeightCM <= 0.0f || tankDiameterCM <= 0.0f)
         return -1;
 
-    return (level / 100.0f) * tankCapacityLiter;
+    float distance = getDistanceCM();
+
+    if(distance < 0)
+        return -1;
+
+    float waterHeight = tankHeightCM - distance;
+    waterHeight = constrain(waterHeight, 0.0f, tankHeightCM);
+
+    float radius = tankDiameterCM / 2.0f;
+    float volumeLiter = (PI * radius * radius * waterHeight) / 1000.0f;
+
+    if (tankCapacityLiter > 0.0f && volumeLiter > tankCapacityLiter) {
+        return tankCapacityLiter;
+    }
+
+    return volumeLiter;
 }

@@ -8,7 +8,7 @@ enum RelayChannel {
     RELAY_SOLENOID_A,
     RELAY_SOLENOID_B,
     RELAY_SOLENOID_IRRIG,
-    RELAY_BUZZER,              // ch5 — buzzer sinyal operator (sebelumnya: RELAY_PUMP_WATER)
+    RELAY_WATER_INLET,         // ch5 — solenoid NC air masuk (menggantikan buzzer)
     RELAY_PUMP_A,
     RELAY_PUMP_B,
     RELAY_PUMP_MIX

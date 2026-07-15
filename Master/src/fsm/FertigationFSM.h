@@ -45,6 +45,7 @@ public:
     bool  isNeedRefillAlertPending() const { return _needRefillAlertPending; }
     float getRefillDeficit()         const { return _refillDeficit; }
     void  clearNeedRefillAlert()           { _needRefillAlertPending = false; }
+    float getFillStartVolume()       const { return _fillStartVolume; }
 
 private:
     void changeState(
@@ -60,8 +61,8 @@ private:
     void startMixer();
     void stopMixer();
 
-    void startBuzzer();
-    void stopBuzzer();
+    void openWaterInlet();
+    void closeWaterInlet();
     void startFillStirrer();
     void stopFillStirrer();
 
@@ -220,9 +221,10 @@ private:
     // Digunakan oleh gotoPostCorrection() untuk kembali ke validate yang benar
     FertigationState correctionOrigin = FertigationState::VALIDATE;
 
-    // State variables untuk deteksi level stabil pada pengisian air manual (FILL_WATER)
+    // State variables untuk deteksi level stabil pada pengisian air otomatis (FILL_WATER)
     float         lastTankVolume      = -1.0f;
     unsigned long lastLevelChangeTime = 0;
+    float         _fillStartVolume    = 0.0f;   // volume awal sebelum solenoid inlet dibuka
 
     // --- Stirring & Daily-check state ---
     // Hari terakhir refreshDailyChecks() dijalankan (cegah re-run pada tick yang sama)

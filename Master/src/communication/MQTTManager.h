@@ -53,7 +53,7 @@
 #define TOPIC_ALERT_TANK_LOW    "greenhouse/alert/tank_low"
 
 // Interval publish sensor (ms)
-#define MQTT_PUBLISH_INTERVAL 5000UL
+#define MQTT_PUBLISH_INTERVAL 1000UL
 
 class MQTTManager {
 public:

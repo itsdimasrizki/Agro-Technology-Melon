@@ -71,8 +71,11 @@ public:
     float    getMaxConsumptionPerPlant() const { return _maxConsumptionPerPlant; }
     float    getTargetFillVolume()       const { return _targetFillVolume; }
     float    getTankCapacityLiter()      const { return _tankCapacityLiter; }
+    float    getTankHeightCM()           const { return _tankHeightCM; }
+    float    getTankDiameterCM()         const { return _tankDiameterCM; }
     void     setSystemConfig(uint16_t plants, float maxConsumption,
-                             float targetFillVolume, float tankCapacity);
+                             float targetFillVolume, float tankCapacity,
+                             float tankHeightCM, float tankDiameterCM);
 
     // ---- Schedule ----
     uint16_t getPlantYear()      const { return _plantYear; }
@@ -132,6 +135,8 @@ private:
     float    _maxConsumptionPerPlant = 15.0f;
     float    _targetFillVolume       = 1.0f;
     float    _tankCapacityLiter      = 15.0f;
+    float    _tankHeightCM           = 45.0f;
+    float    _tankDiameterCM         = 20.6f;
 
     // ---- Schedule ----
     uint16_t _plantYear      = 2026;

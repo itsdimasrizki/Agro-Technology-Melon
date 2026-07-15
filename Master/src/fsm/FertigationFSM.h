@@ -55,6 +55,7 @@ private:
     // --- Condition helpers ---
     bool isTankSafeForMixing();
     bool isPPMInRange();
+    bool isPPMAcceptableForUse();
     bool isStateTimeout(unsigned long timeout);
 
     // --- Actuator helpers ---

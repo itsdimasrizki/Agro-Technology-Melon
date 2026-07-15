@@ -26,6 +26,39 @@ void ConfigManager::begin() {
     Serial.println(_configured ? "YES (from NVS)" : "NO (using defaults)");
 }
 
+bool ConfigManager::isConfigured() const {
+    if (!_configured) return false;
+
+    bool systemOK =
+        _totalPlants > 0 &&
+        _targetFillVolume > 0.0f &&
+        _tankCapacityLiter > 0.0f &&
+        _tankHeightCM > 0.0f &&
+        _tankDiameterCM > 0.0f &&
+        _targetFillVolume <= _tankCapacityLiter;
+
+    bool scheduleOK =
+        _plantYear > 0 &&
+        _plantMonth >= 1 && _plantMonth <= 12 &&
+        _plantDay >= 1 && _plantDay <= 31 &&
+        _dailyMixHour <= 23 &&
+        _dailyMixMinute <= 59;
+
+    bool ppmOK =
+        _ppmTolerance >= 0.0f &&
+        _initialNutrientA > 0.0f &&
+        _initialNutrientB > 0.0f;
+
+    bool phOK =
+        _defaultMinPH > 0.0f &&
+        _defaultMaxPH > _defaultMinPH;
+
+    bool recipeOK = _numRecipeStages > 0;
+    bool irrigationOK = _numIrrigationStages > 0;
+
+    return systemOK && scheduleOK && ppmOK && phOK && recipeOK && irrigationOK;
+}
+
 // =========================================
 // applyDefaults() — nilai fallback
 // =========================================

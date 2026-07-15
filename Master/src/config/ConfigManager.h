@@ -93,8 +93,8 @@ public:
     uint32_t getStirDurationMs()     const { return _stirDurationMs; }
     void     setStirSchedule(uint8_t stirEvHour, uint8_t stirEvMin, uint32_t stirDurMs);
 
-    // True jika minimal satu konfigurasi pernah diterima dari MQTT
-    bool isConfigured() const { return _configured; }
+    // True hanya jika konfigurasi inti dari web sudah lengkap dan valid untuk menjalankan FSM.
+    bool isConfigured() const;
 
     // Hapus konfigurasi dan set ke default kosong
     void clearConfig();

@@ -314,6 +314,11 @@ void MQTTManager::handleConfigRecipe(const JsonDocument& doc) {
         count++;
     }
 
+    if (count == 0) {
+        publishConfigAck("recipe", false);
+        return;
+    }
+
     configManager.setRecipeStages(stages, count);
     publishConfigAck("recipe", true);
 }
@@ -334,6 +339,11 @@ void MQTTManager::handleConfigIrrigation(const JsonDocument& doc) {
         stages[count].dryThreshold  = s["dry_threshold"]  | (uint16_t)3900;
         stages[count].wetThreshold  = s["wet_threshold"]  | (uint16_t)3650;
         count++;
+    }
+
+    if (count == 0) {
+        publishConfigAck("irrigation", false);
+        return;
     }
 
     configManager.setIrrigationStages(stages, count);

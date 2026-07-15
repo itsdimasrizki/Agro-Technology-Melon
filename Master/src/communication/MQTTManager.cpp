@@ -3,8 +3,6 @@
 #include "../config/PinConfig.h"
 
 // Static member definitions
-String       MQTTManager::incomingCommand = "";
-bool         MQTTManager::commandFlag     = false;
 MQTTManager* MQTTManager::_instance      = nullptr;
 
 // =========================================
@@ -78,6 +76,11 @@ void MQTTManager::update(
     if (now - lastSoilPublish >= MQTT_PUBLISH_INTERVAL) {
         lastSoilPublish = now;
         publishSoilHealth();
+    }
+
+    if (now - lastRelayPublish >= MQTT_PUBLISH_INTERVAL) {
+        lastRelayPublish = now;
+        publishRelayStatus();
     }
 }
 
@@ -161,11 +164,24 @@ void MQTTManager::publishRelayStatus() {
     doc["timestamp"] = millis();
 
     JsonObject relays = doc["relays"].to<JsonObject>();
-    relays["water_inlet"] = (digitalRead(RELAY_5_PIN) == LOW);
-    relays["stirrer"]     = (digitalRead(RELAY_1_PIN) == LOW);
-    relays["nutrient_a"]  = (digitalRead(RELAY_2_PIN) == LOW);
-    relays["nutrient_b"]  = (digitalRead(RELAY_3_PIN) == LOW);
-    relays["irrigation"]  = (digitalRead(RELAY_4_PIN) == LOW);
+    relays["relay_1"] = relayManager.isOn(RELAY_MIXER_STIR);
+    relays["relay_2"] = relayManager.isOn(RELAY_SOLENOID_A);
+    relays["relay_3"] = relayManager.isOn(RELAY_SOLENOID_B);
+    relays["relay_4"] = relayManager.isOn(RELAY_SOLENOID_IRRIG);
+    relays["relay_5"] = relayManager.isOn(RELAY_WATER_INLET);
+    relays["relay_6"] = relayManager.isOn(RELAY_PUMP_A);
+    relays["relay_7"] = relayManager.isOn(RELAY_PUMP_B);
+    relays["relay_8"] = relayManager.isOn(RELAY_PUMP_MIX);
+
+    JsonArray active = doc["active_relays"].to<JsonArray>();
+    if (relayManager.isOn(RELAY_MIXER_STIR)) active.add(1);
+    if (relayManager.isOn(RELAY_SOLENOID_A)) active.add(2);
+    if (relayManager.isOn(RELAY_SOLENOID_B)) active.add(3);
+    if (relayManager.isOn(RELAY_SOLENOID_IRRIG)) active.add(4);
+    if (relayManager.isOn(RELAY_WATER_INLET)) active.add(5);
+    if (relayManager.isOn(RELAY_PUMP_A)) active.add(6);
+    if (relayManager.isOn(RELAY_PUMP_B)) active.add(7);
+    if (relayManager.isOn(RELAY_PUMP_MIX)) active.add(8);
 
     char buf[192];
     serializeJson(doc, buf);
@@ -193,13 +209,6 @@ void MQTTManager::publishConfigAck(const char* configName, bool success) {
 // =========================================
 // Command handling
 // =========================================
-bool MQTTManager::hasCommand() const { return commandFlag; }
-
-String MQTTManager::getCommand() {
-    commandFlag = false;
-    return incomingCommand;
-}
-
 bool MQTTManager::isConnected() {
     return mqttClient.connected();
 }
@@ -234,18 +243,18 @@ void MQTTManager::onMessage(
 // configManager, rtcManager, waterLevel
 // =========================================
 void MQTTManager::handleMessage(const char* topic, const String& payload) {
-    // Command fertigasi/aktuator hanya diterima saat larutan sudah READY.
-    // Sebelum READY, command diabaikan agar tidak ada irigasi saat air/nutrisi belum valid.
     if (String(topic) == TOPIC_CMD) {
-        if (fsm.getState() != FertigationState::READY) {
-            Serial.printf("[MQTT] Command ignored: FSM not READY (state=%s)\n",
-                          stateToString(fsm.getState()));
-            publishConfigAck("actuators_cmd_not_ready", false);
+        JsonDocument cmdDoc;
+        DeserializationError cmdErr = deserializeJson(cmdDoc, payload);
+        if (cmdErr) {
+            Serial.printf("[MQTT] Actuator command JSON parse error: %s\n", cmdErr.c_str());
+            publishRelayCommandAck(0, "invalid", false, "json_parse_error");
             return;
         }
 
-        incomingCommand = payload;
-        commandFlag     = true;
+        if (!executeRelayCommand(cmdDoc)) {
+            publishRelayCommandAck(0, "invalid", false, "invalid_payload");
+        }
         return;
     }
 
@@ -272,6 +281,84 @@ void MQTTManager::handleMessage(const char* topic, const String& payload) {
     else if (t == TOPIC_CFG_SCHEDULE) handleConfigSchedule(doc);
     else if (t == TOPIC_CFG_TIMER_IRRIG) handleConfigTimerIrrigation(doc);
     else if (t == TOPIC_CFG_MIX_EXT)  handleConfigMixScheduleExt(doc);
+}
+
+bool MQTTManager::parseRelayIndex(const JsonDocument& doc, uint8_t& relayIndex) const {
+    if (doc["relay"].is<uint8_t>()) {
+        relayIndex = doc["relay"].as<uint8_t>();
+        return relayManager.isValidRelayIndex(relayIndex);
+    }
+
+    if (doc["relay_id"].is<uint8_t>()) {
+        relayIndex = doc["relay_id"].as<uint8_t>();
+        return relayManager.isValidRelayIndex(relayIndex);
+    }
+
+    return false;
+}
+
+RelayChannel MQTTManager::relayIndexToChannel(uint8_t relayIndex) const {
+    switch (relayIndex) {
+        case 1: return RELAY_MIXER_STIR;
+        case 2: return RELAY_SOLENOID_A;
+        case 3: return RELAY_SOLENOID_B;
+        case 4: return RELAY_SOLENOID_IRRIG;
+        case 5: return RELAY_WATER_INLET;
+        case 6: return RELAY_PUMP_A;
+        case 7: return RELAY_PUMP_B;
+        case 8: return RELAY_PUMP_MIX;
+        default: return RELAY_MIXER_STIR;
+    }
+}
+
+void MQTTManager::publishRelayCommandAck(uint8_t relayIndex, const char* action, bool success, const char* reason) {
+    JsonDocument doc;
+    doc["device_id"] = MQTT_CLIENT_ID;
+    doc["relay"] = relayIndex;
+    doc["action"] = action;
+    doc["status"] = success ? "ok" : "error";
+    if (reason) {
+        doc["reason"] = reason;
+    }
+    doc["timestamp"] = millis();
+
+    char buf[160];
+    serializeJson(doc, buf);
+    mqttClient.publish(TOPIC_CONFIG_ACK, buf, false);
+}
+
+bool MQTTManager::executeRelayCommand(const JsonDocument& doc) {
+    uint8_t relayIndex = 0;
+    if (!parseRelayIndex(doc, relayIndex)) {
+        return false;
+    }
+
+    const char* action = doc["action"] | doc["state"] | doc["cmd"] | "toggle";
+    RelayChannel channel = relayIndexToChannel(relayIndex);
+    bool ok = true;
+
+    if (strcmp(action, "on") == 0) {
+        relayManager.on(channel);
+    } else if (strcmp(action, "off") == 0) {
+        relayManager.off(channel);
+    } else if (strcmp(action, "toggle") == 0) {
+        if (relayManager.isOn(channel)) relayManager.off(channel);
+        else relayManager.on(channel);
+    } else if (strcmp(action, "all_off") == 0) {
+        relayManager.allOff();
+    } else {
+        ok = false;
+    }
+
+    if (!ok) {
+        publishRelayCommandAck(relayIndex, action, false, "unknown_action");
+        return false;
+    }
+
+    publishRelayCommandAck(relayIndex, action, true);
+    publishRelayStatus();
+    Serial.printf("[MQTT] Relay command: relay_%u action=%s\n", relayIndex, action);
+    return true;
 }
 
 // =========================================

@@ -45,6 +45,25 @@ void RelayManager::off(RelayChannel relay) {
     digitalWrite(getPin(relay), HIGH);
 }
 
+bool RelayManager::isOn(RelayChannel relay) const {
+    switch (relay) {
+        case RELAY_MIXER_STIR:    return digitalRead(RELAY_1_PIN) == LOW;
+        case RELAY_SOLENOID_A:    return digitalRead(RELAY_2_PIN) == LOW;
+        case RELAY_SOLENOID_B:    return digitalRead(RELAY_3_PIN) == LOW;
+        case RELAY_SOLENOID_IRRIG: return digitalRead(RELAY_4_PIN) == LOW;
+        case RELAY_WATER_INLET:   return digitalRead(RELAY_5_PIN) == LOW;
+        case RELAY_PUMP_A:        return digitalRead(RELAY_6_PIN) == LOW;
+        case RELAY_PUMP_B:        return digitalRead(RELAY_7_PIN) == LOW;
+        case RELAY_PUMP_MIX:      return digitalRead(RELAY_8_PIN) == LOW;
+    }
+
+    return false;
+}
+
+bool RelayManager::isValidRelayIndex(uint8_t index) const {
+    return index >= 1 && index <= 8;
+}
+
 void RelayManager::allOff() {
     off(RELAY_MIXER_STIR);
     off(RELAY_SOLENOID_A);

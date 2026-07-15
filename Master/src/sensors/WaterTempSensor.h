@@ -16,8 +16,8 @@ public:
 
 private:
 
-    OneWire* oneWire;
-    DallasTemperature* sensors;
+    OneWire* oneWire = nullptr;
+    DallasTemperature* sensors = nullptr;
 
     uint8_t _pin;
 };

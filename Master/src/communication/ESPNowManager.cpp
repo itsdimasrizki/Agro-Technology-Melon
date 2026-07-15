@@ -24,6 +24,15 @@ void ESPNowManager::onDataRecv(
     const uint8_t *incomingData,
     int len
 ) {
+    if (len != sizeof(receivedData)) {
+        Serial.printf(
+            "[ESP-NOW] Invalid soil payload size: %d, expected %u\n",
+            len,
+            static_cast<unsigned int>(sizeof(receivedData))
+        );
+        return;
+    }
+
     memcpy(
         &receivedData,
         incomingData,

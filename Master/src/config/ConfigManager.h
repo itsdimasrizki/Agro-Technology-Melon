@@ -100,11 +100,9 @@ public:
     void clearConfig();
 
     // ---- Timer Irrigation (Timer Fallback mode) ----
-    float          getDailyWaterVolumeMLPerPlant() const { return _dailyWaterVolumeMLPerPlant; }
     uint8_t        getNumIrrigationSlots()         const { return _numIrrigationSlots; }
     IrrigationSlot getIrrigationSlot(uint8_t i)    const;
-    void           setTimerIrrigationConfig(float mlPerPlant,
-                                            const IrrigationSlot* slots, uint8_t count);
+    void           setTimerIrrigationConfig(const IrrigationSlot* slots, uint8_t count);
 
 private:
     void applyDefaults();
@@ -152,7 +150,6 @@ private:
     uint32_t _stirDurationMs     = 300000UL;  // durasi stir per sesi (default 5 menit)
 
     // ---- Timer Irrigation ----
-    float          _dailyWaterVolumeMLPerPlant = 200.0f;  // default 200 ml/tanaman/hari
     IrrigationSlot _irrigationSlots[MAX_IRRIG_SLOTS];
     uint8_t        _numIrrigationSlots = 0;
 

@@ -85,7 +85,6 @@ void ConfigManager::applyDefaults() {
     _dailyMixHour   = 0;
     _dailyMixMinute = 0;
 
-    _dailyWaterVolumeMLPerPlant = 0.0f;
     _numIrrigationSlots        = 0;
     memset(_irrigationSlots, 0, sizeof(_irrigationSlots));
 
@@ -157,7 +156,6 @@ void ConfigManager::loadFromNVS() {
 
     // Timer Irrigation
     _prefs.begin(NS_TIMER, true);
-    _dailyWaterVolumeMLPerPlant = _prefs.getFloat("mlPerPlant", _dailyWaterVolumeMLPerPlant);
     _numIrrigationSlots = _prefs.getUChar("slotCount", _numIrrigationSlots);
     if (_numIrrigationSlots > MAX_IRRIG_SLOTS) _numIrrigationSlots = MAX_IRRIG_SLOTS;
     _prefs.getBytes("slots", _irrigationSlots,
@@ -225,7 +223,6 @@ void ConfigManager::saveAll() {
 
     // Timer Irrigation
     _prefs.begin(NS_TIMER, false);
-    _prefs.putFloat("mlPerPlant", _dailyWaterVolumeMLPerPlant);
     _prefs.putUChar("slotCount",  _numIrrigationSlots);
     _prefs.putBytes("slots",      _irrigationSlots,
                     _numIrrigationSlots * sizeof(IrrigationSlot));
@@ -345,11 +342,9 @@ IrrigationSlot ConfigManager::getIrrigationSlot(uint8_t index) const {
     return _irrigationSlots[index];
 }
 
-void ConfigManager::setTimerIrrigationConfig(float mlPerPlant,
-                                             const IrrigationSlot* slots,
+void ConfigManager::setTimerIrrigationConfig(const IrrigationSlot* slots,
                                              uint8_t count) {
     if (count > MAX_IRRIG_SLOTS) count = MAX_IRRIG_SLOTS;
-    _dailyWaterVolumeMLPerPlant = mlPerPlant;
     _numIrrigationSlots         = count;
     memcpy(_irrigationSlots, slots, count * sizeof(IrrigationSlot));
     saveAll();

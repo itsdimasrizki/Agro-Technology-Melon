@@ -23,6 +23,10 @@ public:
 
     void off(RelayChannel relay);
 
+    bool isOn(RelayChannel relay) const;
+
+    bool isValidRelayIndex(uint8_t index) const;
+
     void allOff();
 
 private:

@@ -320,7 +320,63 @@ Keterangan:
 
 Field lama `mix_interval_days` dan `per_plant_need_liter` diabaikan.
 
-## 9. Command Fertigasi / Aktuator
+## 9. Telemetry Status Relay / Aktuator
+
+Topic publish firmware:
+
+```text
+greenhouse/actuators/status
+```
+
+Status saat ini:
+
+- Firmware publish status relay setiap `MQTT_PUBLISH_INTERVAL` atau 1 detik.
+- Firmware juga publish status relay saat state FSM berubah.
+- Publish menggunakan retained message, jadi web/backend yang baru subscribe akan langsung menerima status terakhir.
+- Nilai `true` berarti relay sedang aktif/ON menurut firmware.
+- Nilai `false` berarti relay sedang mati/OFF menurut firmware.
+- Relay module memakai active-low di firmware, tetapi web/backend cukup pakai boolean dari payload ini; tidak perlu membalik logika pin.
+
+Schema payload:
+
+```json
+{
+  "device_id": "greenhouse-master-01",
+  "timestamp": 123456,
+  "relays": {
+    "relay_1": true,
+    "relay_2": false,
+    "relay_3": false,
+    "relay_4": false,
+    "relay_5": false,
+    "relay_6": false,
+    "relay_7": false,
+    "relay_8": true
+  },
+  "active_relays": [1, 8]
+}
+```
+
+Mapping relay:
+
+| Relay | Aktuator |
+|---:|---|
+| `relay_1` | Mixer stir / pengaduk mixing chamber |
+| `relay_2` | Solenoid nutrisi A |
+| `relay_3` | Solenoid nutrisi B |
+| `relay_4` | Solenoid irigasi |
+| `relay_5` | Water inlet / solenoid air masuk |
+| `relay_6` | Pompa nutrisi A |
+| `relay_7` | Pompa nutrisi B |
+| `relay_8` | Pompa mixing / pompa irigasi dari mixing tank |
+
+Catatan untuk web/backend:
+
+- Untuk tampilan sederhana, tampilkan `relays.relay_x` sebagai ON/OFF.
+- Untuk highlight aktuator yang sedang jalan, gunakan `active_relays`.
+- Status ini merepresentasikan state aktual output firmware saat loop MQTT berjalan, baik akibat FSM otomatis maupun command manual yang diterima saat `READY`.
+
+## 10. Command Fertigasi / Aktuator
 
 Topic:
 
@@ -337,7 +393,7 @@ Tujuan:
 
 - Mencegah irigasi/aktuator berjalan ketika air belum terisi, nutrisi belum masuk, mixing belum selesai, atau PPM/pH belum tervalidasi.
 
-## 10. Reset Soil Mode
+## 11. Reset Soil Mode
 
 Topic:
 
@@ -350,7 +406,7 @@ Fungsi:
 - Mengembalikan mode soil monitor ke `HUMIDITY`.
 - Tidak menghapus config NVS.
 
-## 11. Clear Config / Hapus Memori ESP
+## 12. Clear Config / Hapus Memori ESP
 
 Status saat ini:
 
@@ -374,7 +430,7 @@ Payload awal yang disarankan:
 
 Setelah diterima, firmware akan menjalankan `configManager.clearConfig()` dan FSM kembali ke `IDLE`.
 
-## 12. Minimal Urutan Input dari Web
+## 13. Minimal Urutan Input dari Web
 
 Agar firmware keluar dari `IDLE`, web/backend harus mengirim minimal:
 
@@ -387,7 +443,7 @@ Agar firmware keluar dari `IDLE`, web/backend harus mengirim minimal:
 
 Setelah semua valid, FSM akan pindah dari `IDLE` ke `WAIT_DAILY_MIX`.
 
-## 13. Ringkasan Unit Penting
+## 14. Ringkasan Unit Penting
 
 | Data | Unit |
 |---|---:|

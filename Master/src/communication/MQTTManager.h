@@ -79,12 +79,6 @@ public:
     // Publish alert "butuh diisi" (dipanggil dari update() saat FSM set flag di FILL_WATER)
     void publishNeedRefillAlert(float deficitLiter);
 
-    // Cek apakah ada command masuk dari dashboard
-    bool hasCommand() const;
-
-    // Ambil dan reset command terakhir
-    String getCommand();
-
     bool isConnected();
 
 private:
@@ -112,9 +106,6 @@ private:
     static void onMessage(const char* topic, byte* payload, unsigned int length);
     static MQTTManager* _instance;
 
-    static String incomingCommand;
-    static bool   commandFlag;
-
     WiFiClientSecure wifiClient;
     PubSubClient     mqttClient;
     RelayManager&    relayManager;
@@ -123,9 +114,14 @@ private:
     WaterLevel&      waterLevel;
     SoilHealthMonitor& soilHealth;
     FertigationFSM&  fsm;  // untuk polling tank-low alert
+    bool executeRelayCommand(const JsonDocument& doc);
+    bool parseRelayIndex(const JsonDocument& doc, uint8_t& relayIndex) const;
+    RelayChannel relayIndexToChannel(uint8_t relayIndex) const;
+    void publishRelayCommandAck(uint8_t relayIndex, const char* action, bool success, const char* reason = nullptr);
 
     unsigned long lastPublish = 0;
     unsigned long lastSoilPublish = 0;
+    unsigned long lastRelayPublish = 0;
     FertigationState lastFSMState = FertigationState::IDLE;
     IrrigationMode lastIrrigMode = IrrigationMode::HUMIDITY;
 

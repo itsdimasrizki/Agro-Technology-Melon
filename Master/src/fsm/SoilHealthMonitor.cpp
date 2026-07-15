@@ -20,9 +20,6 @@ void SoilHealthMonitor::begin() {
     _prefs.end();
 
     _mode = static_cast<IrrigationMode>(savedMode);
-
-    Serial.print("[SOIL] Mode loaded from NVS: ");
-    Serial.println(_mode == IrrigationMode::TIMER ? "TIMER" : "HUMIDITY");
 }
 
 // =========================================
@@ -41,9 +38,6 @@ void SoilHealthMonitor::update(uint16_t soilADC, bool irrigCompleted, uint16_t c
         _waitingPostIrrig  = true;
         _rule4Evaluated    = false;
         _irrigCycleCount++;
-
-        Serial.printf("[SOIL] Irigasi selesai. ADC before=%-4u, waiting cooldown...\n",
-                      _adcBeforeIrrig);
     }
 
     // --- Evaluasi rule #4 setelah cooldown pasca-irigasi ---
@@ -57,9 +51,6 @@ void SoilHealthMonitor::update(uint16_t soilADC, bool irrigCompleted, uint16_t c
             _rules.noResponse = !responded;
             _rule4Evaluated   = true;
             _waitingPostIrrig = false;
-
-            Serial.printf("[SOIL] Rule#4 eval: ADC before=%-4u after=%-4u => noResponse=%s\n",
-                          _adcBeforeIrrig, soilADC, _rules.noResponse ? "YES" : "NO");
         }
     }
 
@@ -117,13 +108,6 @@ void SoilHealthMonitor::evaluate(uint16_t soilADC) {
 
     if (score < 0) score = 0;
     _healthScore = static_cast<uint8_t>(score);
-
-    Serial.printf("[SOIL] Health eval: score=%d | hb=%s oor=%s fl=%s nr=%s\n",
-                  _healthScore,
-                  _rules.heartbeatTimeout ? "Y" : "N",
-                  _rules.outOfRange       ? "Y" : "N",
-                  _rules.flatline         ? "Y" : "N",
-                  _rules.noResponse       ? "Y" : "N");
 }
 
 // =========================================
@@ -132,7 +116,6 @@ void SoilHealthMonitor::evaluate(uint16_t soilADC) {
 void SoilHealthMonitor::switchToTimerMode() {
     _mode = IrrigationMode::TIMER;
     saveMode();
-    Serial.printf("[SOIL] *** AUTO-SWITCH ke TIMER mode (health=%d%%) ***\n", _healthScore);
 }
 
 // =========================================
@@ -150,7 +133,6 @@ void SoilHealthMonitor::resetToHumidityMode() {
     _rule4Evaluated   = false;
     memset(_adcBuffer, 0, sizeof(_adcBuffer));
     saveMode();
-    Serial.println("[SOIL] Mode direset ke HUMIDITY via MQTT command.");
 }
 
 // =========================================

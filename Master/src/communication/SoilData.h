@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+// Must match Sleeve/src/communication/SoilData.h byte-for-byte for ESP-NOW.
 struct SoilData {
     uint16_t sensor1;
     uint16_t sensor2;

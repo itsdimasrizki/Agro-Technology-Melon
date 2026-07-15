@@ -9,13 +9,11 @@ bool ESPNowManager::begin() {
     WiFi.mode(WIFI_STA);
 
     if(esp_now_init() != ESP_OK) {
-        Serial.println("ESP-NOW Init Failed");
         return false;
     }
 
     esp_now_register_recv_cb(onDataRecv);
 
-    Serial.println("ESP-NOW Ready");
     return true;
 }
 
@@ -24,12 +22,10 @@ void ESPNowManager::onDataRecv(
     const uint8_t *incomingData,
     int len
 ) {
+    (void)mac;
+
+    // Reject packets from incompatible Sleeve firmware.
     if (len != sizeof(receivedData)) {
-        Serial.printf(
-            "[ESP-NOW] Invalid soil payload size: %d, expected %u\n",
-            len,
-            static_cast<unsigned int>(sizeof(receivedData))
-        );
         return;
     }
 

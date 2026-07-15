@@ -1,5 +1,11 @@
 #include "WaterTempSensor.h"
 
+namespace {
+constexpr float FALLBACK_TEMP_C = 25.0f;
+constexpr float MIN_VALID_TEMP_C = -10.0f;
+constexpr float MAX_VALID_TEMP_C = 80.0f;
+}
+
 WaterTempSensor::WaterTempSensor(uint8_t pin) {
     _pin = pin;
 }
@@ -14,14 +20,16 @@ void WaterTempSensor::begin() {
 
 float WaterTempSensor::getTemperature() {
     if (sensors == nullptr) {
-        return 25.0f;
+        return FALLBACK_TEMP_C;
     }
 
     sensors->requestTemperatures();
 
     float temp = sensors->getTempCByIndex(0);
-    if (temp == DEVICE_DISCONNECTED_C || temp == 85.0f || temp < -10.0f || temp > 80.0f) {
-        return 25.0f;
+
+    // DS18B20 commonly returns 85C before a valid conversion.
+    if (temp == DEVICE_DISCONNECTED_C || temp == 85.0f || temp < MIN_VALID_TEMP_C || temp > MAX_VALID_TEMP_C) {
+        return FALLBACK_TEMP_C;
     }
 
     return temp;

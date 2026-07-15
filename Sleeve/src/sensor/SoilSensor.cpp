@@ -17,7 +17,6 @@ SoilSensor::SoilSensor(
 
 void SoilSensor::begin() {
     // analogRead() siap dipakai langsung
-    Serial.println("[Soil] SoilSensor initialized");
 }
 
 void SoilSensor::update() {

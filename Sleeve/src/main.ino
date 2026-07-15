@@ -2,7 +2,8 @@
 #include "sensor/SoilSensor.h"
 #include "communication/ESPNowSender.h"
 
-constexpr unsigned long SEND_INTERVAL_MS = 1000UL; // <Konfigurasi : Ubah interval (ms) jeda pengiriman data dari Sleeve ke Master>
+constexpr unsigned long SEND_INTERVAL_MS = 1000UL;
+constexpr unsigned long STATUS_LOG_INTERVAL_MS = 5000UL;
 
 SoilSensor    soilSensor(
     SOIL_SENSOR_1_PIN,
@@ -14,18 +15,45 @@ SoilSensor    soilSensor(
 ESPNowSender  espNow;
 
 unsigned long lastSendTime = 0;
+unsigned long lastStatusLog = 0;
+bool lastSendOk = false;
+
+void logLine(const char* level, const char* component, const char* message) {
+    Serial.printf(
+        "t=%010lu | %-5s | %-8s | %s\n",
+        millis(),
+        level,
+        component,
+        message
+    );
+}
+
+void logSoilStatus(const SoilData& data, bool sendOk) {
+    Serial.printf(
+        "t=%010lu | INFO  | SOIL     | s1=%u s2=%u s3=%u s4=%u avg=%u espnow=%s\n",
+        millis(),
+        data.sensor1,
+        data.sensor2,
+        data.sensor3,
+        data.sensor4,
+        data.averageRawADC,
+        sendOk ? "OK" : "FAIL"
+    );
+}
 
 void setup() {
     Serial.begin(115200);
 
     soilSensor.begin();
+    logLine("INFO", "BOOT", "soil_sensor=ready");
 
     if (!espNow.begin()) {
-        Serial.println("[Main] ESP-NOW init failed. Halting.");
+        logLine("ERROR", "ESPNOW", "init=failed");
         while (true) { delay(1000); }
     }
 
-    Serial.println("[Main] Sleeve ready.");
+    logLine("INFO", "ESPNOW", "init=ready");
+    logLine("INFO", "BOOT", "system=ready");
 }
 
 void loop() {
@@ -38,16 +66,11 @@ void loop() {
 
         SoilData data = soilSensor.getData();
 
-        bool sent = espNow.send(data);
+        lastSendOk = espNow.send(data);
+    }
 
-        Serial.printf(
-            "[Soil] S1:%4u S2:%4u S3:%4u S4:%4u Avg:%4u | Send:%s\n",
-            data.sensor1,
-            data.sensor2,
-            data.sensor3,
-            data.sensor4,
-            data.averageRawADC,
-            sent ? "OK" : "FAIL"
-        );
+    if (now - lastStatusLog >= STATUS_LOG_INTERVAL_MS) {
+        lastStatusLog = now;
+        logSoilStatus(soilSensor.getData(), lastSendOk);
     }
 }

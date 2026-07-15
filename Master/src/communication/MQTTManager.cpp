@@ -145,14 +145,6 @@ void MQTTManager::publishFSMState(FertigationState state, ErrorCode errorCode) {
     serializeJson(doc, buf);
 
     mqttClient.publish(TOPIC_FSM_STATE, buf, true);
-
-    Serial.print("[MQTT] FSM state: ");
-    Serial.print(stateToString(state));
-    if (errorCode != ErrorCode::NONE) {
-        Serial.print(" | error: ");
-        Serial.print(errorCodeToString(errorCode));
-    }
-    Serial.println();
 }
 
 // =========================================
@@ -203,7 +195,6 @@ void MQTTManager::publishConfigAck(const char* configName, bool success) {
     serializeJson(doc, buf);
 
     mqttClient.publish(TOPIC_CONFIG_ACK, buf, false);
-    Serial.printf("[MQTT] Config ACK: %s = %s\n", configName, success ? "ok" : "error");
 }
 
 // =========================================
@@ -228,11 +219,6 @@ void MQTTManager::onMessage(
         msg += (char)payload[i];
     }
 
-    Serial.print("[MQTT] Received on ");
-    Serial.print(topic);
-    Serial.print(": ");
-    Serial.println(msg);
-
     if (_instance) {
         _instance->handleMessage(topic, msg);
     }
@@ -247,7 +233,6 @@ void MQTTManager::handleMessage(const char* topic, const String& payload) {
         JsonDocument cmdDoc;
         DeserializationError cmdErr = deserializeJson(cmdDoc, payload);
         if (cmdErr) {
-            Serial.printf("[MQTT] Actuator command JSON parse error: %s\n", cmdErr.c_str());
             publishRelayCommandAck(0, "invalid", false, "json_parse_error");
             return;
         }
@@ -267,7 +252,6 @@ void MQTTManager::handleMessage(const char* topic, const String& payload) {
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, payload);
     if (err) {
-        Serial.printf("[MQTT] JSON parse error on %s: %s\n", topic, err.c_str());
         publishConfigAck(topic, false);
         return;
     }
@@ -357,7 +341,6 @@ bool MQTTManager::executeRelayCommand(const JsonDocument& doc) {
 
     publishRelayCommandAck(relayIndex, action, true);
     publishRelayStatus();
-    Serial.printf("[MQTT] Relay command: relay_%u action=%s\n", relayIndex, action);
     return true;
 }
 
@@ -509,15 +492,8 @@ void MQTTManager::connectWiFi() {
     wm.setConfigPortalTimeout(180);
     wm.setTitle("\xF0\x9F\x8C\xB1 Greenhouse Melon");  // 🌱 Greenhouse Melon
 
-    Serial.println("[WiFi] Memulai WiFiManager...");
     bool connected = wm.autoConnect("Melon-Fertigation-Setup");
-
-    if (connected) {
-        Serial.print("[WiFi] Connected, IP: ");
-        Serial.println(WiFi.localIP());
-    } else {
-        Serial.println("[WiFi] Gagal terhubung / portal timeout — will retry next update()");
-    }
+    (void)connected;
 }
 
 // =========================================
@@ -528,14 +504,9 @@ void MQTTManager::connectMQTT() {
 
     wifiClient.setInsecure();
 
-    Serial.print("[MQTT] Connecting to HiveMQ Cloud...");
-
     bool ok = mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
 
     if (ok) {
-        Serial.println(" connected!");
-
-        // Subscribe semua topics
         mqttClient.subscribe(TOPIC_CMD);
         mqttClient.subscribe(TOPIC_CFG_PPM);
         mqttClient.subscribe(TOPIC_CFG_PH);
@@ -546,11 +517,6 @@ void MQTTManager::connectMQTT() {
         mqttClient.subscribe(TOPIC_CFG_TIMER_IRRIG);
         mqttClient.subscribe(TOPIC_CFG_MIX_EXT);
         mqttClient.subscribe(TOPIC_CMD_SOIL_RESET);
-
-        Serial.println("[MQTT] Subscribed to all topics");
-    } else {
-        Serial.print(" failed, rc=");
-        Serial.println(mqttClient.state());
     }
 }
 
@@ -674,9 +640,6 @@ void MQTTManager::publishNeedRefillAlert(float deficitLiter) {
     char buf[192];
     serializeJson(doc, buf);
     mqttClient.publish(TOPIC_ALERT_TANK_LOW, buf, false);
-
-    Serial.printf("[MQTT] Need-refill alert: tank=%.1fL, target=%.1fL, kurang=%.2fL\n",
-                  waterLevel.getVolumeLiter(), configManager.getTargetFillVolume(), deficitLiter);
 }
 
 // =========================================
@@ -701,8 +664,4 @@ void MQTTManager::publishSoilHealth() {
     serializeJson(doc, buf);
 
     mqttClient.publish(TOPIC_SOIL_HEALTH, buf, true);
-    
-    Serial.printf("[MQTT] Published Soil Health. Mode: %s, Health: %d%%\n", 
-                  (soilHealth.getMode() == IrrigationMode::TIMER) ? "TIMER" : "HUMIDITY", 
-                  soilHealth.getHealthScore());
 }

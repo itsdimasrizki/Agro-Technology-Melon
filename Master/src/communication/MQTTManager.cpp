@@ -460,7 +460,7 @@ void MQTTManager::handleConfigSchedule(const JsonDocument& doc) {
 // =========================================
 // connectWiFi() — via WiFiManager captive portal
 // Kredensial disimpan di NVS oleh WiFiManager.
-// Jika belum pernah dikonfigurasi / koneksi gagal, buka AP "Melon-Fertigation-Setup"
+// Jika belum pernah dikonfigurasi / koneksi gagal, buka AP "AgroTech Melon"
 // dengan captive portal bertema hijau-putih selama 180 detik.
 // =========================================
 void MQTTManager::connectWiFi() {
@@ -492,7 +492,7 @@ void MQTTManager::connectWiFi() {
     wm.setConfigPortalTimeout(180);
     wm.setTitle("\xF0\x9F\x8C\xB1 Greenhouse Melon");  // 🌱 Greenhouse Melon
 
-    bool connected = wm.autoConnect("Melon-Fertigation-Setup");
+    bool connected = wm.autoConnect("AgroTech Melon", "KebonagungXUPNVYK");
     (void)connected;
 }
 
@@ -572,7 +572,6 @@ const char* MQTTManager::errorCodeToString(ErrorCode error) {
 // handleConfigTimerIrrigation()
 // =========================================
 void MQTTManager::handleConfigTimerIrrigation(const JsonDocument& doc) {
-    float mlPerPlant = doc["daily_water_volume_ml_per_plant"] | configManager.getDailyWaterVolumeMLPerPlant();
     JsonArrayConst arr = doc["slots"].as<JsonArrayConst>();
     
     if (arr.isNull()) {
@@ -590,7 +589,7 @@ void MQTTManager::handleConfigTimerIrrigation(const JsonDocument& doc) {
         count++;
     }
 
-    configManager.setTimerIrrigationConfig(mlPerPlant, slots, count);
+    configManager.setTimerIrrigationConfig(slots, count);
     publishConfigAck("timer_irrigation", true);
 }
 

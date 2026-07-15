@@ -1012,7 +1012,7 @@ void FertigationFSM::handleTimerIrrigation() {
 
         if (triggeredSlot != -1) {
             // Hitung target volume untuk slot ini dalam mL
-            float dailyVolML = configManager.getDailyWaterVolumeMLPerPlant() * configManager.getTotalPlants();
+            float dailyVolML = configManager.getMaxConsumptionPerPlant() * 1000.0f * configManager.getTotalPlants();
             _timerTargetML = dailyVolML / numSlots;
 
             // Reset flow meter irigasi

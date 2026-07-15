@@ -26,7 +26,7 @@ Schema:
 ```json
 {
   "total_plants": 80,
-  "max_consumption_per_plant": 15,
+  "max_consumption_per_plant": 2,
   "target_fill_volume": 800,
   "tank_capacity_liter": 1000,
   "tank_height_cm": 120,
@@ -39,7 +39,7 @@ Keterangan:
 | Field | Unit | Wajib | Variable firmware | Fungsi |
 |---|---:|---:|---|---|
 | `total_plants` | tanaman | Ya | `_totalPlants` | Jumlah tanaman, dipakai untuk timer irrigation volume total. |
-| `max_consumption_per_plant` | mL atau L sesuai desain web saat ini | Ya | `_maxConsumptionPerPlant` | Disimpan untuk konfigurasi sistem; saat ini belum dominan dipakai di flow utama. |
+| `max_consumption_per_plant` | L/tanaman/hari | Ya | `_maxConsumptionPerPlant` | Kebutuhan air harian maksimal per tanaman. Dipakai timer irrigation fallback untuk menghitung volume harian total. |
 | `target_fill_volume` | liter | Ya | `_targetFillVolume` | Target volume air dalam tangki. Solenoid inlet stop saat `tankVolume >= target_fill_volume`. Biasanya 80–90% kapasitas, bukan 100%. |
 | `tank_capacity_liter` | liter | Ya | `_tankCapacityLiter` | Kapasitas nominal tangki. Dipakai sebagai safety clamp dan deteksi overflow. |
 | `tank_height_cm` | cm | Ya | `_tankHeightCM` | Tinggi efektif tangki dari dasar sampai titik penuh. Dipakai konversi ultrasonic ke liter. |
@@ -264,7 +264,6 @@ Schema:
 
 ```json
 {
-  "daily_water_volume_ml_per_plant": 200,
   "slots": [
     { "hour": 7, "minute": 0 },
     { "hour": 16, "minute": 0 }
@@ -276,14 +275,13 @@ Keterangan:
 
 | Field | Unit | Wajib | Variable firmware | Fungsi |
 |---|---:|---:|---|---|
-| `daily_water_volume_ml_per_plant` | mL/tanaman/hari | Opsional | `_dailyWaterVolumeMLPerPlant` | Volume harian per tanaman untuk mode timer fallback. |
 | `slots[].hour` | 0–23 | Opsional | `IrrigationSlot.hour` | Jam slot timer irrigation. |
 | `slots[].minute` | 0–59 | Opsional | `IrrigationSlot.minute` | Menit slot timer irrigation. |
 
 Perhitungan target per slot:
 
 ```text
-daily_total_ml = daily_water_volume_ml_per_plant × total_plants
+daily_total_ml = max_consumption_per_plant × 1000 × total_plants
 target_per_slot_ml = daily_total_ml / jumlah_slot
 ```
 
@@ -454,7 +452,7 @@ Setelah semua valid, FSM akan pindah dari `IDLE` ke `WAIT_DAILY_MIX`.
 | `initial_a` | liter |
 | `initial_b` | liter |
 | `CORRECTION_DOSE` | liter, fixed 0.05L |
-| `daily_water_volume_ml_per_plant` | mL/tanaman/hari |
+| `max_consumption_per_plant` | L/tanaman/hari |
 | `target_ppm` | ppm |
 | `ppm_tolerance` | ppm |
 | `dry_threshold` / `wet_threshold` | ADC |

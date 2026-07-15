@@ -1,5 +1,11 @@
 #include "TDSSensor.h"
 
+namespace {
+constexpr float FALLBACK_TEMP_C = 25.0f;
+constexpr float MIN_VALID_TEMP_C = -10.0f;
+constexpr float MAX_VALID_TEMP_C = 80.0f;
+}
+
 TDSSensor::TDSSensor(uint8_t pin) {
     _pin = pin;
 }
@@ -7,8 +13,8 @@ TDSSensor::TDSSensor(uint8_t pin) {
 void TDSSensor::begin() {}
 
 float TDSSensor::readPPM(float waterTemp) {
-    if (waterTemp < -10.0f || waterTemp > 80.0f) {
-        waterTemp = 25.0f;
+    if (waterTemp < MIN_VALID_TEMP_C || waterTemp > MAX_VALID_TEMP_C) {
+        waterTemp = FALLBACK_TEMP_C;
     }
 
     const int samples = 30;

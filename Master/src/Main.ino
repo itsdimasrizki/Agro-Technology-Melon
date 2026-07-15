@@ -95,7 +95,153 @@ FertigationFSM fsm(
 
 MQTTManager mqtt(relay, configManager, rtcManager, waterLevel, soilHealth, fsm);
 
-// ISR
+static constexpr unsigned long STATUS_LOG_INTERVAL_MS = 5000UL;
+
+const char* stateToString(FertigationState state) {
+    switch (state) {
+        case FertigationState::IDLE:                    return "IDLE";
+        case FertigationState::WAIT_DAILY_MIX:          return "WAIT_DAILY_MIX";
+        case FertigationState::PREPARE_DAILY_MIX:       return "PREPARE_DAILY_MIX";
+        case FertigationState::FILL_WATER:              return "FILL_WATER";
+        case FertigationState::PRE_MIX_A:               return "PRE_MIX_A";
+        case FertigationState::ADD_NUTRIENT_A:          return "ADD_NUTRIENT_A";
+        case FertigationState::MIX_A:                   return "MIX_A";
+        case FertigationState::PRE_MIX_B:               return "PRE_MIX_B";
+        case FertigationState::ADD_NUTRIENT_B:          return "ADD_NUTRIENT_B";
+        case FertigationState::MIX_B:                   return "MIX_B";
+        case FertigationState::VALIDATE:                return "VALIDATE";
+        case FertigationState::PRE_MIX_CORRECTION:      return "PRE_MIX_CORRECTION";
+        case FertigationState::CORRECT_PPM:             return "CORRECT_PPM";
+        case FertigationState::CORRECTION_MIX:          return "CORRECTION_MIX";
+        case FertigationState::READY:                   return "READY";
+        case FertigationState::PRE_IRRIGATION_MIX:      return "PRE_IRRIGATION_MIX";
+        case FertigationState::PRE_IRRIGATION_VALIDATE: return "PRE_IRRIGATION_VALIDATE";
+        case FertigationState::IRRIGATION:              return "IRRIGATION";
+        case FertigationState::ERROR:                   return "ERROR";
+        default:                                        return "UNKNOWN";
+    }
+}
+
+const char* errorToString(ErrorCode error) {
+    switch (error) {
+        case ErrorCode::NONE:                return "NONE";
+        case ErrorCode::WATER_TIMEOUT:       return "WATER_TIMEOUT";
+        case ErrorCode::NUTRIENT_A_TIMEOUT:  return "NUTRIENT_A_TIMEOUT";
+        case ErrorCode::NUTRIENT_B_TIMEOUT:  return "NUTRIENT_B_TIMEOUT";
+        case ErrorCode::MIXER_DRY_RUN:       return "MIXER_DRY_RUN";
+        case ErrorCode::RTC_FAILURE:         return "RTC_FAILURE";
+        case ErrorCode::PH_SENSOR_FAILURE:   return "PH_SENSOR_FAILURE";
+        case ErrorCode::TDS_SENSOR_FAILURE:  return "TDS_SENSOR_FAILURE";
+        case ErrorCode::ULTRASONIC_FAILURE:  return "ULTRASONIC_FAILURE";
+        case ErrorCode::OVER_PPM:            return "OVER_PPM";
+        case ErrorCode::PH_OUT_OF_RANGE:     return "PH_OUT_OF_RANGE";
+        case ErrorCode::CORRECTION_FAILED:   return "CORRECTION_FAILED";
+        case ErrorCode::WATER_OVERFLOW:      return "WATER_OVERFLOW";
+        case ErrorCode::WAITING_FOR_FILL:    return "WAITING_FOR_FILL";
+        default:                             return "UNKNOWN_ERROR";
+    }
+}
+
+const char* modeToString(IrrigationMode mode) {
+    return mode == IrrigationMode::TIMER ? "TIMER" : "HUMIDITY";
+}
+
+const char* phStatus(float ph) {
+    if (ph < 5.9f) return "PH_UP";
+    if (ph > 6.5f) return "PH_DOWN";
+    return "OK";
+}
+
+void logLine(const char* level, const char* component, const char* message) {
+    Serial.printf(
+        "t=%010lu | %-5s | %-8s | %s\n",
+        millis(),
+        level,
+        component,
+        message
+    );
+}
+
+void logBootStep(const char* component, const char* status) {
+    char message[96];
+    snprintf(message, sizeof(message), "init=%s", status);
+    logLine("INFO", component, message);
+}
+
+void appendRelay(char* buffer, size_t size, bool& first, uint8_t relayIndex) {
+    size_t used = strlen(buffer);
+    snprintf(
+        buffer + used,
+        size - used,
+        "%s%u",
+        first ? "" : ",",
+        relayIndex
+    );
+    first = false;
+}
+
+void formatActiveRelays(char* buffer, size_t size) {
+    snprintf(buffer, size, "[");
+    bool first = true;
+    if (relay.isOn(RELAY_MIXER_STIR)) appendRelay(buffer, size, first, 1);
+    if (relay.isOn(RELAY_SOLENOID_A)) appendRelay(buffer, size, first, 2);
+    if (relay.isOn(RELAY_SOLENOID_B)) appendRelay(buffer, size, first, 3);
+    if (relay.isOn(RELAY_SOLENOID_IRRIG)) appendRelay(buffer, size, first, 4);
+    if (relay.isOn(RELAY_WATER_INLET)) appendRelay(buffer, size, first, 5);
+    if (relay.isOn(RELAY_PUMP_A)) appendRelay(buffer, size, first, 6);
+    if (relay.isOn(RELAY_PUMP_B)) appendRelay(buffer, size, first, 7);
+    if (relay.isOn(RELAY_PUMP_MIX)) appendRelay(buffer, size, first, 8);
+    strncat(buffer, "]", size - strlen(buffer) - 1);
+}
+
+void logSystemStatus(const SensorData& data) {
+    char activeRelays[32];
+    formatActiveRelays(activeRelays, sizeof(activeRelays));
+
+    SoilRuleFlags rules = soilHealth.getActiveRules();
+    Serial.printf(
+        "t=%010lu | INFO  | STATUS   | state=%s error=%s wifi=%s mqtt=%s ip=%s temp=%.1fC ph=%.2f(%s) ppm=%.0f tank=%.1fL soil=%u flowA=%.3fL flowB=%.3fL relays=%s soilMode=%s soilHealth=%u rules{hb=%u,oor=%u,flat=%u,nr=%u}\n",
+        millis(),
+        stateToString(fsm.getState()),
+        errorToString(fsm.getError()),
+        WiFi.status() == WL_CONNECTED ? "UP" : "DOWN",
+        mqtt.isConnected() ? "UP" : "DOWN",
+        WiFi.localIP().toString().c_str(),
+        data.temperature,
+        data.ph,
+        phStatus(data.ph),
+        data.ppm,
+        data.tankVolume,
+        data.soilADC,
+        data.flowA,
+        data.flowB,
+        activeRelays,
+        modeToString(soilHealth.getMode()),
+        soilHealth.getHealthScore(),
+        rules.heartbeatTimeout,
+        rules.outOfRange,
+        rules.flatline,
+        rules.noResponse
+    );
+}
+
+void logStateEvent(FertigationState state, ErrorCode error) {
+    char message[96];
+    snprintf(
+        message,
+        sizeof(message),
+        "state=%s error=%s",
+        stateToString(state),
+        errorToString(error)
+    );
+    logLine(error == ErrorCode::NONE ? "INFO" : "WARN", "FSM", message);
+}
+
+void logConnectionEvent(bool mqttConnected) {
+    char message[64];
+    snprintf(message, sizeof(message), "mqtt=%s", mqttConnected ? "UP" : "DOWN");
+    logLine(mqttConnected ? "INFO" : "WARN", "NETWORK", message);
+}
 
 void IRAM_ATTR flowAISR() {
     flowA.pulseCount++;
@@ -114,66 +260,61 @@ void setup() {
     // Tunggu USB CDC siap (wajib untuk ESP32-S3 USB CDC)
     unsigned long t = millis();
     while (!Serial && (millis() - t) < 3000) delay(10);
-    Serial.println("[BOOT] Serial ready");
+    logLine("INFO", "BOOT", "serial=ready");
 
-    // 1. Inisialisasi ConfigManager
-    Serial.println("[1] ConfigManager...");
     configManager.begin();
+    logBootStep("CONFIG", configManager.isConfigured() ? "configured" : "waiting_config");
 
-    Serial.println("[2] Relay...");
     relay.begin();
+    logBootStep("RELAY", "ready");
 
-    Serial.println("[3] FlowMeters...");
     flowA.begin(flowAISR);
     flowB.begin(flowBISR);
     flowIrrig.begin(flowIrrigISR);
+    logBootStep("FLOW", "ready");
 
-    Serial.println("[4] Wire I2C...");
     Wire.begin(
         I2C_SDA_PIN,
         I2C_SCL_PIN
     );
+    logBootStep("I2C", "ready");
 
-    Serial.println("[5] WaterLevel...");
     waterLevel.begin();
     waterLevel.setTankCapacity(configManager.getTankCapacityLiter());
     waterLevel.setTankHeight(configManager.getTankHeightCM());
     waterLevel.setTankDiameter(configManager.getTankDiameterCM());
+    logBootStep("WATERLVL", "ready");
 
-    Serial.println("[6] WaterTemp...");
     waterTemp.begin();
+    logBootStep("TEMP", "ready");
     
-    Serial.println("[7] RTC...");
     rtcManager.begin();
     rtcManager.setPlantingDate(configManager.getPlantYear(), configManager.getPlantMonth(), configManager.getPlantDay());
     rtcManager.setDailyMixSchedule(configManager.getDailyMixHour(), configManager.getDailyMixMinute());
+    logBootStep("RTC", rtcManager.isOk() ? "ready" : "error");
 
-    Serial.println("[8] Recovery...");
     recovery.begin();
+    logBootStep("RECOVERY", "ready");
 
     // recovery.clear();
 
-    Serial.println("[9] PH & TDS Sensor...");
     phSensor.begin();
     tdsSensor.begin();
+    logBootStep("PH_TDS", "ready");
 
-    Serial.println("[10] ESP-NOW...");
-    if(!espNow.begin()) {
-        Serial.println("  -> ESP-NOW Error!");
-    } else {
-        Serial.println("  -> ESP-NOW OK");
-    }
+    bool espNowOk = espNow.begin();
+    logBootStep("ESPNOW", espNowOk ? "ready" : "error");
 
-    Serial.println("[10.5] SoilHealthMonitor...");
     soilHealth.begin();
+    logBootStep("SOIL", modeToString(soilHealth.getMode()));
 
-    Serial.println("[11] FSM...");
     fsm.begin();
+    logStateEvent(fsm.getState(), fsm.getError());
 
-    Serial.println("[12] MQTT...");
     mqtt.begin();
+    logConnectionEvent(mqtt.isConnected());
 
-    Serial.println("=== System Ready ===");
+    logLine("INFO", "BOOT", "system=ready");
     delay(5000);
 }
 
@@ -183,53 +324,28 @@ void loop() {
     SensorData sensorData = sensorManager.getData();
     mqtt.update(sensorData, fsm.getState(), fsm.getError());
 
-    static unsigned long lastPrint = 0;
+    static FertigationState lastLoggedState = fsm.getState();
+    static ErrorCode lastLoggedError = fsm.getError();
+    static bool lastLoggedMqtt = mqtt.isConnected();
+    static unsigned long lastStatusLog = 0;
 
-    if(millis() - lastPrint >= 1000){
-        lastPrint = millis();
+    FertigationState currentState = fsm.getState();
+    ErrorCode currentError = fsm.getError();
+    bool mqttConnected = mqtt.isConnected();
 
-        SensorData data = sensorManager.getData();
+    if (currentState != lastLoggedState || currentError != lastLoggedError) {
+        lastLoggedState = currentState;
+        lastLoggedError = currentError;
+        logStateEvent(currentState, currentError);
+    }
 
-        Serial.print("Alamat MAC ESP32-S3: ");
-        Serial.println(WiFi.macAddress());
+    if (mqttConnected != lastLoggedMqtt) {
+        lastLoggedMqtt = mqttConnected;
+        logConnectionEvent(mqttConnected);
+    }
 
-        Serial.print("Temp : ");
-        Serial.println(data.temperature);
-
-        Serial.print("PH : ");
-        Serial.print(data.ph);
-        if (data.ph < 5.9) {
-            Serial.println(" (Indikator: Butuh PH UP)");
-        } else if (data.ph > 6.5) {
-            Serial.println(" (Indikator: Butuh PH DOWN)");
-        } else {
-            Serial.println(" (Indikator: NORMAL)");
-        }
-
-        Serial.print("PPM : ");
-        Serial.println(data.ppm);
-
-        Serial.print("Water Volume (L) : ");
-        Serial.println(data.waterLevel);
-
-        Serial.print("Soil : ");
-        Serial.println(data.soilADC);
-
-        Serial.print("Flow Water : ");
-        Serial.println(data.flowWater);
-
-        Serial.print("Flow A : ");
-        Serial.println(data.flowA);
-
-        Serial.print("Flow B : ");
-        Serial.println(data.flowB);
-
-        Serial.print("Tank Volume : ");
-        Serial.println(data.tankVolume);
-
-        Serial.print("MQTT : ");
-        Serial.println(mqtt.isConnected() ? "Connected" : "Disconnected");
-
-        Serial.println("----------------");
+    if (millis() - lastStatusLog >= STATUS_LOG_INTERVAL_MS) {
+        lastStatusLog = millis();
+        logSystemStatus(sensorData);
     }
 }

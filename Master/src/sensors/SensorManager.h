@@ -53,7 +53,7 @@ private:
     FlowMeter& flowA;
     FlowMeter& flowB;
 
-    // State machine untuk pembacaan sequential (mencegah GND nabrak)
+    // Sequential reads reduce analog sensor interference.
     enum ReadState {
         STATE_READ_PH   = 0,
         STATE_WAIT_PH   = 1,
@@ -64,13 +64,12 @@ private:
     };
 
     ReadState     _readState;
-    unsigned long _lastStateChange;   // kapan state terakhir berganti
-    unsigned long _lastLevelUpdate;   // throttle water level (ultrasonic)
+    unsigned long _lastStateChange;
+    unsigned long _lastLevelUpdate;
 
-    // Interval delay antar sensor (ms)
-    static const unsigned long PH_SAMPLE_INTERVAL   = 500UL;   // baca PH setiap 500ms (averaging)
-    static const unsigned long SENSOR_GAP_MS         = 30000UL; // 30 detik jeda antar sensor
-    static const unsigned long TEMP_CONVERT_MS       = 750UL;   // DS18B20 konversi
+    static const unsigned long PH_SAMPLE_INTERVAL   = 500UL;
+    static const unsigned long SENSOR_GAP_MS         = 30000UL;
+    static const unsigned long TEMP_CONVERT_MS       = 750UL;
 };
 
 #endif

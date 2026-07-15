@@ -325,8 +325,6 @@ void FertigationFSM::refreshDailyChecks() {
 
     // 1. Refresh threshold irigasi harian (independen dari siklus mixing)
     currentIrrigation = irrigationRecipe.getRecipe(age);
-    Serial.printf("[FSM] Daily refresh: dry=%u, wet=%u\n",
-                  currentIrrigation.dryThreshold, currentIrrigation.wetThreshold);
 
     // 2. Reset flag stir harian
     _morningStirDone = false;
@@ -355,8 +353,6 @@ bool FertigationFSM::checkMinimumWater() {
         if (!_tankLowBlocked) {
             _tankLowBlocked = true;
             setWarning(ErrorCode::WAITING_FOR_FILL);
-            Serial.printf("[FSM] Tank di bawah safety floor (%.1fL < %.1fL) — irigasi diblokir\n",
-                          sensor.tankVolume, TANK_SAFETY_FLOOR_LITER);
         }
         return false;
     }
@@ -622,10 +618,6 @@ void FertigationFSM::handleFillWater() {
             closeWaterInlet();
         }
         stateInitialized = true;
-        Serial.printf("[FSM] Fill water otomatis: start=%.1fL, target=%.1fL, perlu=%.1fL\n",
-                      _fillStartVolume,
-                      configManager.getTargetFillVolume(),
-                      max(0.0f, configManager.getTargetFillVolume() - _fillStartVolume));
     }
 
     // Deteksi perubahan level yang nyata (di atas threshold noise ultrasonik)
@@ -639,8 +631,6 @@ void FertigationFSM::handleFillWater() {
     if (sensor.tankVolume > configManager.getTankCapacityLiter()) {
         closeWaterInlet();
         setWarning(ErrorCode::WATER_OVERFLOW);
-        Serial.printf("[FSM] WATER_OVERFLOW: vol=%.1fL > cap=%.1fL — solenoid inlet ditutup\n",
-                      sensor.tankVolume, configManager.getTankCapacityLiter());
     } else if (currentError == ErrorCode::WATER_OVERFLOW) {
         clearWarning();
     }
@@ -663,12 +653,6 @@ void FertigationFSM::handleFillWater() {
             _lastRefillAlertMs        = millis();
             _refillDeficit            = configManager.getTargetFillVolume() - sensor.tankVolume;
             _needRefillAlertPending   = true;
-            Serial.printf("[FSM] Filling: start=%.1fL, now=%.1fL, target=%.1fL, filled=%.1fL, remaining=%.1fL\n",
-                          _fillStartVolume,
-                          sensor.tankVolume,
-                          configManager.getTargetFillVolume(),
-                          sensor.tankVolume - _fillStartVolume,
-                          _refillDeficit);
         }
     }
 }
@@ -809,8 +793,6 @@ void FertigationFSM::handleValidate() {
         relayManager.off(RELAY_SOLENOID_B);
         if (!isPPMInRange()) {
             setWarning(ErrorCode::OVER_PPM);
-            Serial.printf("[FSM] PPM over target tetapi diterima: ppm=%.0f, target=%u, tolerance=%.0f\n",
-                          sensor.ppm, targetPPM, configManager.getPPMTolerance());
         } else if (currentError == ErrorCode::OVER_PPM) {
             clearWarning();
         }
@@ -844,8 +826,6 @@ void FertigationFSM::handleCorrectPPM() {
         relayManager.off(RELAY_SOLENOID_B);
         if (!isPPMInRange()) {
             setWarning(ErrorCode::OVER_PPM);
-            Serial.printf("[FSM] Koreksi PPM dihentikan: ppm sudah cukup/over (ppm=%.0f, target=%u)\n",
-                          sensor.ppm, targetPPM);
         } else if (currentError == ErrorCode::OVER_PPM) {
             clearWarning();
         }
@@ -979,8 +959,6 @@ void FertigationFSM::handlePreIrrigationValidate() {
     if (ppmOK && phOK) {
         if (!isPPMInRange()) {
             setWarning(ErrorCode::OVER_PPM);
-            Serial.printf("[FSM] Pre-irrigation PPM over tetapi irigasi diizinkan: ppm=%.0f, target=%u\n",
-                          sensor.ppm, targetPPM);
         } else if (currentError == ErrorCode::OVER_PPM) {
             clearWarning();
         }
@@ -1047,28 +1025,16 @@ void FertigationFSM::handleTimerIrrigation() {
             _timerSlotRunning = true;
             _activeSlotIdx = triggeredSlot;
             _lastSlotMinute = rtcMinute;
-
-            Serial.printf("[FSM] Timer Fallback Irrigation Triggered: Slot %d at %02d:%02d. Target: %.1f mL (%.3f L)\n",
-                          _activeSlotIdx, rtcHour, rtcMinute, _timerTargetML, _timerTargetML / 1000.0f);
         }
     } else {
         // Sedang irigasi timer, monitor flow sensor
         float currentVolLiters = irrigFlow.getVolumeLiter();
         float targetLiters = _timerTargetML / 1000.0f;
 
-        // Log progress setiap 5 detik
-        static unsigned long lastLog = 0;
-        if (millis() - lastLog >= 5000) {
-            lastLog = millis();
-            Serial.printf("[FSM] Timer Irrig Slot %d Progress: %.3f L / %.3f L\n", _activeSlotIdx, currentVolLiters, targetLiters);
-        }
-
         if (currentVolLiters >= targetLiters) {
             // Tutup solenoid + matikan pompa
             relayManager.off(RELAY_PUMP_MIX);
             relayManager.off(RELAY_SOLENOID_IRRIG);
-
-            Serial.printf("[FSM] Timer Fallback Irrigation Completed: Slot %d. Total: %.3f L\n", _activeSlotIdx, currentVolLiters);
 
             _timerSlotRunning = false;
             _activeSlotIdx = -1;
@@ -1116,49 +1082,33 @@ const char* FertigationFSM::stateToString(FertigationState s) {
 }
 
 void FertigationFSM::logStateTransition(FertigationState newState) {
-    Serial.print("[FSM] -> ");
-    Serial.println(stateToString(newState));
+    (void)newState;
 }
 
 void FertigationFSM::logStateAction(const char* message) {
-    Serial.println(message);
+    (void)message;
 }
 
 void FertigationFSM::logRecipe() {
-    Serial.println();
-    Serial.println("===== DAILY RECIPE =====");
-    Serial.print("Target PPM : ");
-    Serial.println(targetPPM);
-    Serial.print("pH Range   : ");
-    Serial.print(targetMinPH);
-    Serial.print(" - ");
-    Serial.println(targetMaxPH);
-    Serial.print("Nutrient A : ");
-    Serial.println(targetNutrientA);
-    Serial.print("Nutrient B : ");
-    Serial.println(targetNutrientB);
-    Serial.println("========================");
 }
 
 void FertigationFSM::logError() {
-    Serial.print("[FSM] ERROR : ");
-    Serial.println(static_cast<int>(currentError));
 }
 
 void FertigationFSM::logError(const char* message) {
-    Serial.println(message);
+    (void)message;
 }
 
 void FertigationFSM::logRecovery(const char* message) {
-    Serial.println(message);
+    (void)message;
 }
 
 void FertigationFSM::logRecovery(
     const char* message,
     FertigationState recoveryState
 ) {
-    Serial.print(message);
-    Serial.println(stateToString(recoveryState));
+    (void)message;
+    (void)recoveryState;
 }
 
 // ============================================================

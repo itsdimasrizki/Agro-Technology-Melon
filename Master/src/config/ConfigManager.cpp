@@ -20,10 +20,6 @@ static const char* NS_MIX   = "cfg_mix";    // Mixing Interval & Stirring Schedu
 void ConfigManager::begin() {
     applyDefaults();
     loadFromNVS();
-
-    Serial.println("[CFG] ConfigManager ready");
-    Serial.print("[CFG] Configured: ");
-    Serial.println(_configured ? "YES (from NVS)" : "NO (using defaults)");
 }
 
 bool ConfigManager::isConfigured() const {
@@ -175,7 +171,6 @@ void ConfigManager::loadFromNVS() {
     _stirDurationMs    = _prefs.getULong("stirDurMs",   _stirDurationMs);
     _prefs.end();
 
-    Serial.println("[CFG] Loaded from NVS");
 }
 
 // =========================================
@@ -272,7 +267,6 @@ void ConfigManager::clearConfig() {
     _prefs.begin(NS_MIX, false);   _prefs.clear(); _prefs.end();
 
     _configured = false;
-    Serial.println("[CFG] Configuration cleared/wiped.");
 }
 
 // =========================================
@@ -283,15 +277,12 @@ void ConfigManager::setPPMConfig(float tolerance, float initA, float initB) {
     _initialNutrientA = initA;
     _initialNutrientB = initB;
     saveAll();
-    Serial.printf("[CFG] PPM updated: tol=%.0f, A=%.2fL, B=%.2fL\n",
-                  tolerance, initA, initB);
 }
 
 void ConfigManager::setPHConfig(float minPH, float maxPH) {
     _defaultMinPH = minPH;
     _defaultMaxPH = maxPH;
     saveAll();
-    Serial.printf("[CFG] pH updated: min=%.2f, max=%.2f\n", minPH, maxPH);
 }
 
 void ConfigManager::setRecipeStages(const RecipeStageConfig* stages, uint8_t count) {
@@ -299,7 +290,6 @@ void ConfigManager::setRecipeStages(const RecipeStageConfig* stages, uint8_t cou
     _numRecipeStages = count;
     memcpy(_recipeStages, stages, count * sizeof(RecipeStageConfig));
     saveAll();
-    Serial.printf("[CFG] Recipe updated: %d stages\n", count);
 }
 
 void ConfigManager::setIrrigationStages(const IrrigationStageConfig* stages, uint8_t count) {
@@ -307,7 +297,6 @@ void ConfigManager::setIrrigationStages(const IrrigationStageConfig* stages, uin
     _numIrrigationStages = count;
     memcpy(_irrigationStages, stages, count * sizeof(IrrigationStageConfig));
     saveAll();
-    Serial.printf("[CFG] Irrigation updated: %d stages\n", count);
 }
 
 void ConfigManager::setSystemConfig(uint16_t plants, float maxConsumption,
@@ -320,8 +309,6 @@ void ConfigManager::setSystemConfig(uint16_t plants, float maxConsumption,
     _tankHeightCM           = tankHeightCM;
     _tankDiameterCM         = tankDiameterCM;
     saveAll();
-    Serial.printf("[CFG] System updated: plants=%d, targetFillVol=%.2fL, tankCap=%.2fL, tankHeight=%.1fcm, tankDiameter=%.1fcm\n",
-                  plants, targetFillVolume, tankCapacity, tankHeightCM, tankDiameterCM);
 }
 
 void ConfigManager::setScheduleConfig(uint16_t year, uint8_t month, uint8_t day,
@@ -332,8 +319,6 @@ void ConfigManager::setScheduleConfig(uint16_t year, uint8_t month, uint8_t day,
     _dailyMixHour   = mixHour;
     _dailyMixMinute = mixMinute;
     saveAll();
-    Serial.printf("[CFG] Schedule updated: plant=%04d-%02d-%02d, mix=%02d:%02d\n",
-                  year, month, day, mixHour, mixMinute);
 }
 
 // =========================================
@@ -368,8 +353,6 @@ void ConfigManager::setTimerIrrigationConfig(float mlPerPlant,
     _numIrrigationSlots         = count;
     memcpy(_irrigationSlots, slots, count * sizeof(IrrigationSlot));
     saveAll();
-    Serial.printf("[CFG] Timer irrigation updated: %.0fmL/plant, %d slots\n",
-                  mlPerPlant, count);
 }
 
 void ConfigManager::setStirSchedule(uint8_t stirEvHour, uint8_t stirEvMin,
@@ -378,6 +361,4 @@ void ConfigManager::setStirSchedule(uint8_t stirEvHour, uint8_t stirEvMin,
     _stirEveningMinute = stirEvMin;
     _stirDurationMs    = stirDurMs;
     saveAll();
-    Serial.printf("[CFG] Stir schedule updated: stirEv=%02d:%02d, stirDur=%lums\n",
-                  stirEvHour, stirEvMin, (unsigned long)stirDurMs);
 }

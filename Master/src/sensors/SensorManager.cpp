@@ -77,6 +77,8 @@ void SensorManager::update() {
 
     if (now - _lastLevelUpdate >= 100UL) {
         float tankVolume = levelSensor.getVolumeLiter();
+
+        // Keep the last valid volume when ultrasonic read times out.
         if (tankVolume >= 0.0f) {
             data.tankVolume = tankVolume;
             data.waterLevel = tankVolume;

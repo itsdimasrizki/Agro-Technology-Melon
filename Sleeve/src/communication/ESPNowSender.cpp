@@ -7,7 +7,6 @@ bool ESPNowSender::begin() {
     WiFi.disconnect();
 
     if (esp_now_init() != ESP_OK) {
-        Serial.println("[ESP-NOW] Init failed!");
         return false;
     }
 
@@ -19,11 +18,9 @@ bool ESPNowSender::begin() {
     peerInfo.encrypt = false;
 
     if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-        Serial.println("[ESP-NOW] Add peer failed!");
         return false;
     }
 
-    Serial.println("[ESP-NOW] Ready. Peer registered.");
     return true;
 }
 

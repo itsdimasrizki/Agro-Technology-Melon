@@ -218,6 +218,10 @@ bool FertigationFSM::isPPMInRange() {
     return abs(sensor.ppm - targetPPM) <= configManager.getPPMTolerance();
 }
 
+bool FertigationFSM::isPPMAcceptableForUse() {
+    return sensor.ppm >= (targetPPM - configManager.getPPMTolerance());
+}
+
 bool FertigationFSM::isStateTimeout(unsigned long timeout) {
     return millis() - stateStartTime > timeout;
 }
@@ -798,7 +802,18 @@ void FertigationFSM::handleMixB() {
 }
 
 void FertigationFSM::handleValidate() {
-    if (isPPMInRange()) {
+    if (isPPMAcceptableForUse()) {
+        relayManager.off(RELAY_PUMP_A);
+        relayManager.off(RELAY_SOLENOID_A);
+        relayManager.off(RELAY_PUMP_B);
+        relayManager.off(RELAY_SOLENOID_B);
+        if (!isPPMInRange()) {
+            setWarning(ErrorCode::OVER_PPM);
+            Serial.printf("[FSM] PPM over target tetapi diterima: ppm=%.0f, target=%u, tolerance=%.0f\n",
+                          sensor.ppm, targetPPM, configManager.getPPMTolerance());
+        } else if (currentError == ErrorCode::OVER_PPM) {
+            clearWarning();
+        }
         gotoReady();
     } else {
         gotoCorrection();
@@ -822,7 +837,18 @@ void FertigationFSM::handlePreMixCorrection() {
 }
 
 void FertigationFSM::handleCorrectPPM() {
-    if (isPPMInRange()) {
+    if (isPPMAcceptableForUse()) {
+        relayManager.off(RELAY_PUMP_A);
+        relayManager.off(RELAY_SOLENOID_A);
+        relayManager.off(RELAY_PUMP_B);
+        relayManager.off(RELAY_SOLENOID_B);
+        if (!isPPMInRange()) {
+            setWarning(ErrorCode::OVER_PPM);
+            Serial.printf("[FSM] Koreksi PPM dihentikan: ppm sudah cukup/over (ppm=%.0f, target=%u)\n",
+                          sensor.ppm, targetPPM);
+        } else if (currentError == ErrorCode::OVER_PPM) {
+            clearWarning();
+        }
         gotoReady();
         return;
     }
@@ -947,12 +973,19 @@ void FertigationFSM::handlePreIrrigationMix() {
 }
 
 void FertigationFSM::handlePreIrrigationValidate() {
-    bool ppmOK = isPPMInRange();
+    bool ppmOK = isPPMAcceptableForUse();
     bool phOK  = sensor.ph >= targetMinPH && sensor.ph <= targetMaxPH;
 
     if (ppmOK && phOK) {
+        if (!isPPMInRange()) {
+            setWarning(ErrorCode::OVER_PPM);
+            Serial.printf("[FSM] Pre-irrigation PPM over tetapi irigasi diizinkan: ppm=%.0f, target=%u\n",
+                          sensor.ppm, targetPPM);
+        } else if (currentError == ErrorCode::OVER_PPM) {
+            clearWarning();
+        }
         changeState(FertigationState::IRRIGATION);
-    } else if (sensor.ppm < targetPPM) {
+    } else if (!ppmOK) {
         gotoCorrection();
     } else {
         gotoError(ErrorCode::PH_OUT_OF_RANGE);

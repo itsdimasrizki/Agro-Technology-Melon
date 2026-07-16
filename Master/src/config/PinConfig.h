@@ -21,24 +21,14 @@
 #define I2C_SDA_PIN         14
 #define I2C_SCL_PIN         15
 
-// RELAY 7, 8, 12, 13, 16, 17, 18, 21
-
-// #define RELAY_1_PIN         21
-// #define RELAY_2_PIN         38
-// #define RELAY_3_PIN         39
-// #define RELAY_4_PIN         40
-// #define RELAY_5_PIN         41
-// #define RELAY_6_PIN         42
-// #define RELAY_7_PIN         47
-// #define RELAY_8_PIN         48
-
-#define RELAY_1_PIN         7
-#define RELAY_2_PIN         8
-#define RELAY_3_PIN         12
-#define RELAY_4_PIN         13
-#define RELAY_5_PIN         16
-#define RELAY_6_PIN         17
-#define RELAY_7_PIN         18
-#define RELAY_8_PIN         21
+// Relay
+#define RELAY_1_PIN         21 // Mixer Stirrer
+#define RELAY_2_PIN         8  // Solenoid A
+#define RELAY_3_PIN         7  // Solenoid B
+#define RELAY_4_PIN         18 // Solenoid Irrigation
+#define RELAY_5_PIN         16 // Solenoid Water
+#define RELAY_6_PIN         13 // Pump A
+#define RELAY_7_PIN         12 // Pump B
+#define RELAY_8_PIN         17 // Pump Mix
 
 #endif

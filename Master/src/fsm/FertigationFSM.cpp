@@ -60,6 +60,8 @@ soilHealthMonitor(soilHealth)
 
 //! Begin
 void FertigationFSM::begin() {
+    stopNutrientFlowCounting();
+
     if (!rtcManager.isOk()) {
         logError("[FSM] RTC gagal — masuk ERROR state");
         enterError(ErrorCode::RTC_FAILURE);
@@ -190,6 +192,7 @@ void FertigationFSM::update() {
 
 //! ChangeState
 void FertigationFSM::changeState(FertigationState newState) {
+    stopNutrientFlowCounting();
     state = newState;
     stateStartTime = millis();
     stateInitialized = false;
@@ -293,6 +296,11 @@ void FertigationFSM::startNutrientB() {
 void FertigationFSM::stopNutrientB() {
     relayManager.off(RELAY_PUMP_B);
     relayManager.off(RELAY_SOLENOID_B);
+}
+
+void FertigationFSM::stopNutrientFlowCounting() {
+    nutrientAFlow.setCountingEnabled(false);
+    nutrientBFlow.setCountingEnabled(false);
 }
 
 //! RECIPE
@@ -677,9 +685,14 @@ void FertigationFSM::handleAddNutrientA() {
     }
 
     if (!stateInitialized) {
+        bool wasRecovering = recovering;
         consumeRecovery();
+        if (!wasRecovering) {
+            nutrientAFlow.reset();
+        }
         lastPulseTime = millis();
         pulseOpenState = true;
+        nutrientAFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_A);
         relayManager.on(RELAY_SOLENOID_A);
         stateInitialized = true;
@@ -702,6 +715,7 @@ void FertigationFSM::handleAddNutrientA() {
     }
 
     if (sensor.flowA >= targetNutrientA) {
+        nutrientAFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_A);
         relayManager.off(RELAY_SOLENOID_A);
         changeState(FertigationState::MIX_A);
@@ -741,9 +755,14 @@ void FertigationFSM::handleAddNutrientB() {
     }
 
     if (!stateInitialized) {
+        bool wasRecovering = recovering;
         consumeRecovery();
+        if (!wasRecovering) {
+            nutrientBFlow.reset();
+        }
         lastPulseTime = millis();
         pulseOpenState = true;
+        nutrientBFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_B);
         relayManager.on(RELAY_SOLENOID_B);
         stateInitialized = true;
@@ -766,6 +785,7 @@ void FertigationFSM::handleAddNutrientB() {
     }
 
     if (sensor.flowB >= targetNutrientB) {
+        nutrientBFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_B);
         relayManager.off(RELAY_SOLENOID_B);
         changeState(FertigationState::MIX_B);
@@ -834,9 +854,10 @@ void FertigationFSM::handleCorrectPPM() {
     }
 
     if (!stateInitialized) {
+        bool wasRecovering = recovering;
         consumeRecovery();
 
-        if (!recovering) {
+        if (!wasRecovering) {
             nutrientAFlow.reset();
             nutrientBFlow.reset();
         }
@@ -845,10 +866,12 @@ void FertigationFSM::handleCorrectPPM() {
         pulseOpenState = true;
 
         if (sensor.flowA < CORRECTION_DOSE) {
+            nutrientAFlow.setCountingEnabled(true);
             relayManager.on(RELAY_PUMP_A);
             relayManager.on(RELAY_SOLENOID_A);
         }
         if (sensor.flowB < CORRECTION_DOSE) {
+            nutrientBFlow.setCountingEnabled(true);
             relayManager.on(RELAY_PUMP_B);
             relayManager.on(RELAY_SOLENOID_B);
         }
@@ -884,10 +907,12 @@ void FertigationFSM::handleCorrectPPM() {
 
     // Matikan segera jika sudah melampaui target
     if (sensor.flowA >= CORRECTION_DOSE) {
+        nutrientAFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_A);
         relayManager.off(RELAY_SOLENOID_A);
     }
     if (sensor.flowB >= CORRECTION_DOSE) {
+        nutrientBFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_B);
         relayManager.off(RELAY_SOLENOID_B);
     }

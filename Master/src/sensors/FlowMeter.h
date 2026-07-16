@@ -18,11 +18,18 @@ public:
 
     void setPulseCount(uint32_t val);
 
+    void setCountingEnabled(bool enabled);
+
+    bool isCountingEnabled() const;
+
+    void recordPulseFromISR();
+
     volatile uint32_t pulseCount;
 
 private:
 
     uint8_t _pin;
+    volatile bool _countingEnabled;
 
     unsigned long lastCalcTime;
     uint32_t lastPulseCount;

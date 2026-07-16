@@ -26,7 +26,14 @@ MQTTManager::MQTTManager(RelayManager& relay, ConfigManager& config,
 // begin() — koneksi WiFi + MQTT
 // =========================================
 void MQTTManager::begin() {
+    Serial.printf("t=%010lu | INFO  | NETWORK  | wifi=begin\n", millis());
     connectWiFi();
+    Serial.printf(
+        "t=%010lu | INFO  | NETWORK  | wifi=%s ip=%s\n",
+        millis(),
+        WiFi.status() == WL_CONNECTED ? "UP" : "DOWN",
+        WiFi.localIP().toString().c_str()
+    );
 
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
     mqttClient.setCallback(onMessage);
@@ -260,6 +267,7 @@ void MQTTManager::handleMessage(const char* topic, const String& payload) {
     if      (t == TOPIC_CFG_PPM)      handleConfigPPM(doc);
     else if (t == TOPIC_CFG_PH)       handleConfigPH(doc);
     else if (t == TOPIC_CFG_RECIPE)   handleConfigRecipe(doc);
+    else if (t == TOPIC_CFG_RECIPE_DELETE) handleDeleteRecipe(doc);
     else if (t == TOPIC_CFG_IRRIG)    handleConfigIrrigation(doc);
     else if (t == TOPIC_CFG_SYSTEM)   handleConfigSystem(doc);
     else if (t == TOPIC_CFG_SCHEDULE) handleConfigSchedule(doc);
@@ -393,6 +401,23 @@ void MQTTManager::handleConfigRecipe(const JsonDocument& doc) {
     publishConfigAck("recipe", true);
 }
 
+void MQTTManager::handleDeleteRecipe(const JsonDocument& doc) {
+    bool deleted = false;
+
+    if (doc["index"].is<uint8_t>()) {
+        deleted = configManager.deleteRecipeStage(doc["index"].as<uint8_t>());
+    } else if (doc["stage"].is<uint8_t>()) {
+        uint8_t stage = doc["stage"].as<uint8_t>();
+        if (stage > 0) {
+            deleted = configManager.deleteRecipeStage(stage - 1);
+        }
+    } else if (doc["max_age_days"].is<uint16_t>()) {
+        deleted = configManager.deleteRecipeStageByMaxAge(doc["max_age_days"].as<uint16_t>());
+    }
+
+    publishConfigAck("recipe/delete", deleted);
+}
+
 void MQTTManager::handleConfigIrrigation(const JsonDocument& doc) {
     JsonArrayConst arr = doc["stages"].as<JsonArrayConst>();
     if (arr.isNull()) {
@@ -488,12 +513,21 @@ void MQTTManager::connectWiFi() {
 )rawhtml";
 
     WiFiManager wm;
+    wm.setDebugOutput(false);
     wm.setCustomHeadElement(customCSS);
     wm.setConfigPortalTimeout(180);
     wm.setTitle("\xF0\x9F\x8C\xB1 Greenhouse Melon");  // 🌱 Greenhouse Melon
 
+    Serial.printf("t=%010lu | INFO  | WIFI     | portal=ready ssid=\"AgroTech Melon\"\n", millis());
     bool connected = wm.autoConnect("AgroTech Melon", "KebonagungXUPNVYK");
-    (void)connected;
+    Serial.printf(
+        "t=%010lu | %s | WIFI     | connected=%s status=%d ip=%s\n",
+        millis(),
+        connected ? "INFO " : "WARN ",
+        connected ? "true" : "false",
+        WiFi.status(),
+        WiFi.localIP().toString().c_str()
+    );
 }
 
 // =========================================
@@ -507,16 +541,25 @@ void MQTTManager::connectMQTT() {
     bool ok = mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
 
     if (ok) {
+        Serial.printf("t=%010lu | INFO  | MQTT     | connected=true\n", millis());
         mqttClient.subscribe(TOPIC_CMD);
         mqttClient.subscribe(TOPIC_CFG_PPM);
         mqttClient.subscribe(TOPIC_CFG_PH);
         mqttClient.subscribe(TOPIC_CFG_RECIPE);
+        mqttClient.subscribe(TOPIC_CFG_RECIPE_DELETE);
         mqttClient.subscribe(TOPIC_CFG_IRRIG);
         mqttClient.subscribe(TOPIC_CFG_SYSTEM);
         mqttClient.subscribe(TOPIC_CFG_SCHEDULE);
         mqttClient.subscribe(TOPIC_CFG_TIMER_IRRIG);
         mqttClient.subscribe(TOPIC_CFG_MIX_EXT);
         mqttClient.subscribe(TOPIC_CMD_SOIL_RESET);
+    } else {
+        Serial.printf(
+            "t=%010lu | WARN  | MQTT     | connected=false state=%d wifi=%s\n",
+            millis(),
+            mqttClient.state(),
+            WiFi.status() == WL_CONNECTED ? "UP" : "DOWN"
+        );
     }
 }
 

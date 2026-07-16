@@ -80,6 +80,7 @@ private:
     void stopPreMixNutrientB();
     void startNutrientB();
     void stopNutrientB();
+    void stopNutrientFlowCounting();
 
     // --- Recipe ---
     void prepareDailyRecipe();

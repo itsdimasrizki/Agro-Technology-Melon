@@ -4,6 +4,7 @@ FlowMeter::FlowMeter(uint8_t pin) {
     _pin = pin;
 
     pulseCount = 0;
+    _countingEnabled = true;
 
     lastCalcTime = millis();
 
@@ -73,4 +74,20 @@ void FlowMeter::setPulseCount(uint32_t val) {
     interrupts();
 
     lastCalcTime = millis();
+}
+
+void FlowMeter::setCountingEnabled(bool enabled) {
+    noInterrupts();
+    _countingEnabled = enabled;
+    interrupts();
+}
+
+bool FlowMeter::isCountingEnabled() const {
+    return _countingEnabled;
+}
+
+void FlowMeter::recordPulseFromISR() {
+    if (_countingEnabled) {
+        pulseCount++;
+    }
 }

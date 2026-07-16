@@ -39,6 +39,7 @@
 #define TOPIC_CFG_PPM       "greenhouse/config/ppm"
 #define TOPIC_CFG_PH        "greenhouse/config/ph"
 #define TOPIC_CFG_RECIPE    "greenhouse/config/recipe"
+#define TOPIC_CFG_RECIPE_DELETE "greenhouse/config/recipe/delete"
 #define TOPIC_CFG_IRRIG     "greenhouse/config/irrigation"
 #define TOPIC_CFG_SYSTEM    "greenhouse/config/system"
 #define TOPIC_CFG_SCHEDULE  "greenhouse/config/schedule"
@@ -95,6 +96,7 @@ private:
     void handleConfigPPM(const JsonDocument& doc);
     void handleConfigPH(const JsonDocument& doc);
     void handleConfigRecipe(const JsonDocument& doc);
+    void handleDeleteRecipe(const JsonDocument& doc);
     void handleConfigIrrigation(const JsonDocument& doc);
     void handleConfigSystem(const JsonDocument& doc);
     void handleConfigSchedule(const JsonDocument& doc);

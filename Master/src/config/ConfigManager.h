@@ -60,6 +60,8 @@ public:
     uint8_t           getNumRecipeStages()          const { return _numRecipeStages; }
     RecipeStageConfig getRecipeStage(uint8_t index) const;
     void              setRecipeStages(const RecipeStageConfig* stages, uint8_t count);
+    bool              deleteRecipeStage(uint8_t index);
+    bool              deleteRecipeStageByMaxAge(uint16_t maxAgeDays);
 
     // ---- Irrigation Stages ----
     uint8_t               getNumIrrigationStages()          const { return _numIrrigationStages; }

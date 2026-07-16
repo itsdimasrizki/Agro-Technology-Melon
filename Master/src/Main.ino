@@ -1,6 +1,7 @@
 #include <Wire.h>
 
 #include <WiFi.h>
+#include <Preferences.h>
 
 #include "config/PinConfig.h"
 #include "config/ConfigManager.h"
@@ -96,6 +97,45 @@ FertigationFSM fsm(
 MQTTManager mqtt(relay, configManager, rtcManager, waterLevel, soilHealth, fsm);
 
 static constexpr unsigned long STATUS_LOG_INTERVAL_MS = 5000UL;
+static const char* FIRMWARE_BUILD_ID = __DATE__ " " __TIME__;
+
+void clearPreferencesNamespace(const char* ns) {
+    Preferences prefs;
+    prefs.begin(ns, false);
+    prefs.clear();
+    prefs.end();
+}
+
+void resetAppNVSOnFirmwareChange() {
+    Preferences prefs;
+    prefs.begin("fw_meta", false);
+    String lastBuild = prefs.getString("build", "");
+
+    if (lastBuild == FIRMWARE_BUILD_ID) {
+        prefs.end();
+        return;
+    }
+
+    prefs.end();
+
+    clearPreferencesNamespace("cfg_meta");
+    clearPreferencesNamespace("cfg_ppm");
+    clearPreferencesNamespace("cfg_ph");
+    clearPreferencesNamespace("cfg_recipe");
+    clearPreferencesNamespace("cfg_irrig");
+    clearPreferencesNamespace("cfg_sys");
+    clearPreferencesNamespace("cfg_sched");
+    clearPreferencesNamespace("cfg_timer");
+    clearPreferencesNamespace("cfg_mix");
+    clearPreferencesNamespace("cfg_soil");
+    clearPreferencesNamespace("fertigation");
+
+    prefs.begin("fw_meta", false);
+    prefs.putString("build", FIRMWARE_BUILD_ID);
+    prefs.end();
+
+    logLine("INFO", "NVS", "app_config=reset reason=new_firmware");
+}
 
 const char* stateToString(FertigationState state) {
     switch (state) {
@@ -194,34 +234,64 @@ void formatActiveRelays(char* buffer, size_t size) {
     strncat(buffer, "]", size - strlen(buffer) - 1);
 }
 
+void formatSoilRules(char* buffer, size_t size, const SoilRuleFlags& rules) {
+    snprintf(
+        buffer,
+        size,
+        "%c%c%c%c",
+        rules.heartbeatTimeout ? 'H' : '-',
+        rules.outOfRange ? 'O' : '-',
+        rules.flatline ? 'F' : '-',
+        rules.noResponse ? 'N' : '-'
+    );
+}
+
 void logSystemStatus(const SensorData& data) {
     char activeRelays[32];
     formatActiveRelays(activeRelays, sizeof(activeRelays));
 
     SoilRuleFlags rules = soilHealth.getActiveRules();
+    char soilRules[8];
+    formatSoilRules(soilRules, sizeof(soilRules), rules);
+
+    unsigned long now = millis();
+
     Serial.printf(
-        "t=%010lu | INFO  | STATUS   | state=%s error=%s wifi=%s mqtt=%s ip=%s temp=%.1fC ph=%.2f(%s) ppm=%.0f tank=%.1fL soil=%u flowA=%.3fL flowB=%.3fL relays=%s soilMode=%s soilHealth=%u rules{hb=%u,oor=%u,flat=%u,nr=%u}\n",
-        millis(),
+        "t=%010lu | INFO  | STATUS   | state=%s error=%s\n",
+        now,
         stateToString(fsm.getState()),
-        errorToString(fsm.getError()),
+        errorToString(fsm.getError())
+    );
+    Serial.printf(
+        "t=%010lu | INFO  | NETWORK  | wifi=%s mqtt=%s ip=%s\n",
+        now,
         WiFi.status() == WL_CONNECTED ? "UP" : "DOWN",
         mqtt.isConnected() ? "UP" : "DOWN",
-        WiFi.localIP().toString().c_str(),
+        WiFi.localIP().toString().c_str()
+    );
+    Serial.printf(
+        "t=%010lu | INFO  | SENSOR   | temp=%.1fC ph=%.2f/%s ppm=%.0f tank=%.1fL soil=%u\n",
+        now,
         data.temperature,
         data.ph,
         phStatus(data.ph),
         data.ppm,
         data.tankVolume,
-        data.soilADC,
+        data.soilADC
+    );
+    Serial.printf(
+        "t=%010lu | INFO  | FLOW     | A=%.3fL B=%.3fL relays=%s\n",
+        now,
         data.flowA,
         data.flowB,
-        activeRelays,
+        activeRelays
+    );
+    Serial.printf(
+        "t=%010lu | INFO  | SOIL     | mode=%s health=%u rules=%s\n",
+        now,
         modeToString(soilHealth.getMode()),
         soilHealth.getHealthScore(),
-        rules.heartbeatTimeout,
-        rules.outOfRange,
-        rules.flatline,
-        rules.noResponse
+        soilRules
     );
 }
 
@@ -244,15 +314,15 @@ void logConnectionEvent(bool mqttConnected) {
 }
 
 void IRAM_ATTR flowAISR() {
-    flowA.pulseCount++;
+    flowA.recordPulseFromISR();
 }
 
 void IRAM_ATTR flowBISR() {
-    flowB.pulseCount++;
+    flowB.recordPulseFromISR();
 }
 
 void IRAM_ATTR flowIrrigISR() {
-    flowIrrig.pulseCount++;
+    flowIrrig.recordPulseFromISR();
 }
 
 void setup() {
@@ -261,6 +331,8 @@ void setup() {
     unsigned long t = millis();
     while (!Serial && (millis() - t) < 3000) delay(10);
     logLine("INFO", "BOOT", "serial=ready");
+
+    resetAppNVSOnFirmwareChange();
 
     configManager.begin();
     logBootStep("CONFIG", configManager.isConfigured() ? "configured" : "waiting_config");

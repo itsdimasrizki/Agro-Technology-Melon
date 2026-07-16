@@ -289,6 +289,31 @@ void ConfigManager::setRecipeStages(const RecipeStageConfig* stages, uint8_t cou
     saveAll();
 }
 
+bool ConfigManager::deleteRecipeStage(uint8_t index) {
+    if (index >= _numRecipeStages) {
+        return false;
+    }
+
+    for (uint8_t i = index; i + 1 < _numRecipeStages; i++) {
+        _recipeStages[i] = _recipeStages[i + 1];
+    }
+
+    _numRecipeStages--;
+    memset(&_recipeStages[_numRecipeStages], 0, sizeof(RecipeStageConfig));
+    saveAll();
+    return true;
+}
+
+bool ConfigManager::deleteRecipeStageByMaxAge(uint16_t maxAgeDays) {
+    for (uint8_t i = 0; i < _numRecipeStages; i++) {
+        if (_recipeStages[i].maxAgeDays == maxAgeDays) {
+            return deleteRecipeStage(i);
+        }
+    }
+
+    return false;
+}
+
 void ConfigManager::setIrrigationStages(const IrrigationStageConfig* stages, uint8_t count) {
     if (count > MAX_IRRIGATION_STAGES) count = MAX_IRRIGATION_STAGES;
     _numIrrigationStages = count;

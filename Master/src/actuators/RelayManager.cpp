@@ -3,16 +3,16 @@
 
 static uint8_t relayOnLevel(RelayChannel relay) {
     switch (relay) {
-        case RELAY_MIXER_STIR:
         case RELAY_PUMP_A:
         case RELAY_PUMP_B:
+        case RELAY_WATER_INLET:
         case RELAY_PUMP_MIX:
-            return LOW;
-
+        return LOW;
+        
+        case RELAY_MIXER_STIR:
         case RELAY_SOLENOID_A:
         case RELAY_SOLENOID_B:
         case RELAY_SOLENOID_IRRIG:
-        case RELAY_WATER_INLET:
             return HIGH;
     }
 
@@ -23,17 +23,21 @@ static uint8_t relayOffLevel(RelayChannel relay) {
     return relayOnLevel(relay) == HIGH ? LOW : HIGH;
 }
 
-void RelayManager::begin() {
-    allOff();
+static void configureRelayPin(uint8_t pin, RelayChannel relay) {
+    digitalWrite(pin, relayOffLevel(relay));
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, relayOffLevel(relay));
+}
 
-    pinMode(RELAY_1_PIN, OUTPUT);
-    pinMode(RELAY_2_PIN, OUTPUT);
-    pinMode(RELAY_3_PIN, OUTPUT);
-    pinMode(RELAY_4_PIN, OUTPUT);
-    pinMode(RELAY_5_PIN, OUTPUT);
-    pinMode(RELAY_6_PIN, OUTPUT);
-    pinMode(RELAY_7_PIN, OUTPUT);
-    pinMode(RELAY_8_PIN, OUTPUT);
+void RelayManager::begin() {
+    configureRelayPin(RELAY_1_PIN, RELAY_MIXER_STIR);
+    configureRelayPin(RELAY_2_PIN, RELAY_SOLENOID_A);
+    configureRelayPin(RELAY_3_PIN, RELAY_SOLENOID_B);
+    configureRelayPin(RELAY_4_PIN, RELAY_SOLENOID_IRRIG);
+    configureRelayPin(RELAY_5_PIN, RELAY_WATER_INLET);
+    configureRelayPin(RELAY_6_PIN, RELAY_PUMP_A);
+    configureRelayPin(RELAY_7_PIN, RELAY_PUMP_B);
+    configureRelayPin(RELAY_8_PIN, RELAY_PUMP_MIX);
 
     allOff();
 }

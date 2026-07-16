@@ -23,6 +23,20 @@ DateTime RTCManager::now() const {
     return _dt;
 }
 
+void RTCManager::setDateTime(
+    uint16_t year,
+    uint8_t month,
+    uint8_t day,
+    uint8_t hour,
+    uint8_t minute,
+    uint8_t second
+) {
+    if (!_rtcOk) return;
+
+    _dt = DateTime(year, month, day, hour, minute, second);
+    rtc.adjust(_dt);
+}
+
 uint16_t RTCManager::minuteOfDay() const {
     return static_cast<uint16_t>(_dt.hour() * 60U + _dt.minute());
 }

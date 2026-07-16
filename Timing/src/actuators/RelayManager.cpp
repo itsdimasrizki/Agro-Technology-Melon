@@ -21,21 +21,27 @@ static uint8_t relayOffLevel(RelayChannel relay) {
     return relayOnLevel(relay) == HIGH ? LOW : HIGH;
 }
 
-static void configureRelayPin(uint8_t pin, RelayChannel relay) {
+static bool isControlledRelay(RelayChannel relay) {
+    return relay == RELAY_MIXER_STIR ||
+           relay == RELAY_SOLENOID_IRRIG ||
+           relay == RELAY_PUMP_MIX;
+}
+
+static void configureOutputOff(uint8_t pin, RelayChannel relay) {
     digitalWrite(pin, relayOffLevel(relay));
     pinMode(pin, OUTPUT);
     digitalWrite(pin, relayOffLevel(relay));
 }
 
 void RelayManager::begin() {
-    configureRelayPin(RELAY_1_PIN, RELAY_MIXER_STIR);
-    configureRelayPin(RELAY_2_PIN, RELAY_SOLENOID_A);
-    configureRelayPin(RELAY_3_PIN, RELAY_SOLENOID_B);
-    configureRelayPin(RELAY_4_PIN, RELAY_SOLENOID_IRRIG);
-    configureRelayPin(RELAY_5_PIN, RELAY_WATER_INLET);
-    configureRelayPin(RELAY_6_PIN, RELAY_PUMP_A);
-    configureRelayPin(RELAY_7_PIN, RELAY_PUMP_B);
-    configureRelayPin(RELAY_8_PIN, RELAY_PUMP_MIX);
+    configureOutputOff(RELAY_1_PIN, RELAY_MIXER_STIR);
+    configureOutputOff(RELAY_2_PIN, RELAY_SOLENOID_A);
+    configureOutputOff(RELAY_3_PIN, RELAY_SOLENOID_B);
+    configureOutputOff(RELAY_4_PIN, RELAY_SOLENOID_IRRIG);
+    configureOutputOff(RELAY_5_PIN, RELAY_WATER_INLET);
+    configureOutputOff(RELAY_6_PIN, RELAY_PUMP_A);
+    configureOutputOff(RELAY_7_PIN, RELAY_PUMP_B);
+    configureOutputOff(RELAY_8_PIN, RELAY_PUMP_MIX);
 
     allOff();
 }
@@ -56,6 +62,8 @@ uint8_t RelayManager::getPin(RelayChannel relay) const {
 }
 
 void RelayManager::on(RelayChannel relay) {
+    if (!isControlledRelay(relay)) return;
+
     digitalWrite(getPin(relay), relayOnLevel(relay));
 }
 

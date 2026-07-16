@@ -1,9 +1,17 @@
 #include "TimerIrrigationScheduler.h"
 
 static constexpr IrrigationSlot IRRIGATION_SLOTS[] = {
+    {23,  18, 23,  19},
     {7,  0, 7,  5},
-    {12, 0, 12, 5},
-    {17, 0, 17, 5},
+    {8,  0, 8,  5},
+    {9,  0, 9,  5},
+    {10,  0, 10,  5},
+    {11,  0, 11,  5},
+    {12,  0, 12,  5},
+    {13,  0, 13,  5},
+    {14,  0, 14,  5},
+    {15, 0, 15, 5},
+    {16, 0, 16, 5},
 };
 
 static constexpr uint8_t NUM_IRRIGATION_SLOTS =
@@ -24,9 +32,6 @@ relay(relayManager)
 
 void TimerIrrigationScheduler::begin() {
     relay.allOff();
-
-    // Pompa mix dibiarkan ON 24/7 sesuai kebutuhan testing hardware saat ini.
-    relay.on(RELAY_PUMP_MIX);
 
     state = TimingState::IDLE;
     activeSlot = -1;
@@ -79,17 +84,17 @@ void TimerIrrigationScheduler::applyState(TimingState nextState, int8_t slotInde
 
     relay.off(RELAY_MIXER_STIR);
     relay.off(RELAY_SOLENOID_IRRIG);
-
-    // Pompa mix tetap ON 24/7.
-    relay.on(RELAY_PUMP_MIX);
+    relay.off(RELAY_PUMP_MIX);
 
     switch (state) {
         case TimingState::MIXING:
             relay.on(RELAY_MIXER_STIR);
+            relay.on(RELAY_PUMP_MIX);
             break;
 
         case TimingState::IRRIGATING:
             relay.on(RELAY_SOLENOID_IRRIG);
+            relay.on(RELAY_PUMP_MIX);
             break;
 
         case TimingState::IDLE:

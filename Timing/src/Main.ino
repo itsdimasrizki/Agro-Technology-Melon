@@ -11,6 +11,12 @@ RTCManager rtcManager;
 TimerIrrigationScheduler scheduler(rtcManager, relay);
 
 static constexpr unsigned long STATUS_LOG_INTERVAL_MS = 5000UL;
+static constexpr uint16_t RTC_BOOTSTRAP_YEAR = 2026;
+static constexpr uint8_t RTC_BOOTSTRAP_MONTH = 7;
+static constexpr uint8_t RTC_BOOTSTRAP_DAY = 16;
+static constexpr uint8_t RTC_BOOTSTRAP_HOUR = 23;
+static constexpr uint8_t RTC_BOOTSTRAP_MINUTE = 2;
+static constexpr uint8_t RTC_BOOTSTRAP_SECOND = 0;
 
 void logLine(const char* level, const char* component, const char* message) {
     Serial.printf(
@@ -39,6 +45,16 @@ void logStatus() {
     );
 }
 
+bool isRtcBeforeBootstrapTime() {
+    if (rtcManager.getYear() != RTC_BOOTSTRAP_YEAR) {
+        return rtcManager.getYear() < RTC_BOOTSTRAP_YEAR;
+    }
+    if (rtcManager.getMonth() != RTC_BOOTSTRAP_MONTH) {
+        return rtcManager.getMonth() < RTC_BOOTSTRAP_MONTH;
+    }
+    return rtcManager.getDay() < RTC_BOOTSTRAP_DAY;
+}
+
 void setup() {
     Serial.begin(115200);
     unsigned long serialStart = millis();
@@ -54,6 +70,17 @@ void setup() {
 
     rtcManager.begin();
     logLine("INFO", "RTC", rtcManager.isOk() ? "ready" : "error");
+    if (rtcManager.isOk() && isRtcBeforeBootstrapTime()) {
+        rtcManager.setDateTime(
+            RTC_BOOTSTRAP_YEAR,
+            RTC_BOOTSTRAP_MONTH,
+            RTC_BOOTSTRAP_DAY,
+            RTC_BOOTSTRAP_HOUR,
+            RTC_BOOTSTRAP_MINUTE,
+            RTC_BOOTSTRAP_SECOND
+        );
+        logLine("INFO", "RTC", "time=bootstrapped");
+    }
 
     scheduler.begin();
     logLine("INFO", "SCHED", "ready");

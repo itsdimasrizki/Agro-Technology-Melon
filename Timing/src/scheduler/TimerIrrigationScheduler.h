@@ -30,7 +30,7 @@ public:
     const char* stateName() const;
 
 private:
-    static constexpr uint16_t MIXING_DURATION_MINUTES = 10;
+    static constexpr uint16_t MIXING_DURATION_MINUTES = 1;
 
     RTCManager& rtc;
     RelayManager& relay;

@@ -7,7 +7,7 @@ static uint8_t relayOnLevel(RelayChannel relay) {
         case RELAY_PUMP_B:
         case RELAY_WATER_INLET:
         case RELAY_PUMP_MIX:
-        return LOW;
+            return LOW;
         
         case RELAY_MIXER_STIR:
         case RELAY_SOLENOID_A:
@@ -19,11 +19,33 @@ static uint8_t relayOnLevel(RelayChannel relay) {
     return HIGH;
 }
 
+static bool relayOffUsesInput(RelayChannel relay) {
+    return relayOnLevel(relay) == LOW;
+}
+
+static bool relayIsUnmanaged(RelayChannel relay) {
+    return relay == RELAY_PUMP_A || relay == RELAY_PUMP_B;
+}
+
 static uint8_t relayOffLevel(RelayChannel relay) {
     return relayOnLevel(relay) == HIGH ? LOW : HIGH;
 }
 
+static bool relayState[9] = {};
+
 static void configureRelayPin(uint8_t pin, RelayChannel relay) {
+    if (relayIsUnmanaged(relay)) {
+        digitalWrite(pin, LOW);
+        pinMode(pin, INPUT);
+        return;
+    }
+
+    if (relayOffUsesInput(relay)) {
+        digitalWrite(pin, LOW);
+        pinMode(pin, INPUT);
+        return;
+    }
+
     digitalWrite(pin, relayOffLevel(relay));
     pinMode(pin, OUTPUT);
     digitalWrite(pin, relayOffLevel(relay));
@@ -66,26 +88,48 @@ uint8_t RelayManager::getPin(RelayChannel relay) {
 }
 
 void RelayManager::on(RelayChannel relay) {
-    digitalWrite(getPin(relay), relayOnLevel(relay));
+    uint8_t pin = getPin(relay);
+
+    if (relayIsUnmanaged(relay)) {
+        digitalWrite(pin, LOW);
+        pinMode(pin, INPUT);
+        relayState[relay] = false;
+        return;
+    }
+
+    digitalWrite(pin, relayOnLevel(relay));
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, relayOnLevel(relay));
+
+    relayState[relay] = true;
 }
 
 void RelayManager::off(RelayChannel relay) {
-    digitalWrite(getPin(relay), relayOffLevel(relay));
+    uint8_t pin = getPin(relay);
+
+    if (relayIsUnmanaged(relay)) {
+        digitalWrite(pin, LOW);
+        pinMode(pin, INPUT);
+        relayState[relay] = false;
+        return;
+    }
+
+    if (relayOffUsesInput(relay)) {
+        digitalWrite(pin, LOW);
+        pinMode(pin, INPUT);
+    } else {
+        digitalWrite(pin, relayOffLevel(relay));
+        pinMode(pin, OUTPUT);
+        digitalWrite(pin, relayOffLevel(relay));
+    }
+
+    relayState[relay] = false;
 }
 
 bool RelayManager::isOn(RelayChannel relay) const {
-    switch (relay) {
-        case RELAY_MIXER_STIR:    return digitalRead(RELAY_1_PIN) == relayOnLevel(relay);
-        case RELAY_SOLENOID_A:    return digitalRead(RELAY_2_PIN) == relayOnLevel(relay);
-        case RELAY_SOLENOID_B:    return digitalRead(RELAY_3_PIN) == relayOnLevel(relay);
-        case RELAY_SOLENOID_IRRIG: return digitalRead(RELAY_4_PIN) == relayOnLevel(relay);
-        case RELAY_WATER_INLET:   return digitalRead(RELAY_5_PIN) == relayOnLevel(relay);
-        case RELAY_PUMP_A:        return digitalRead(RELAY_6_PIN) == relayOnLevel(relay);
-        case RELAY_PUMP_B:        return digitalRead(RELAY_7_PIN) == relayOnLevel(relay);
-        case RELAY_PUMP_MIX:      return digitalRead(RELAY_8_PIN) == relayOnLevel(relay);
-    }
-
-    return false;
+    return relay >= RELAY_MIXER_STIR && relay <= RELAY_PUMP_MIX
+        ? relayState[relay]
+        : false;
 }
 
 bool RelayManager::isValidRelayIndex(uint8_t index) const {

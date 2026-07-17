@@ -7,7 +7,7 @@ static uint8_t relayOnLevel(RelayChannel relay) {
         case RELAY_PUMP_B:
         case RELAY_WATER_INLET:
         case RELAY_PUMP_MIX:
-        return LOW;
+            return LOW;
         
         case RELAY_MIXER_STIR:
         case RELAY_SOLENOID_A:

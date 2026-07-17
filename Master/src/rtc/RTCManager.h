@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <RTClib.h>
+#include "TestFlags.h"
 
 class RTCManager {
 public:
@@ -30,6 +31,11 @@ public:
 
     uint8_t getDailyMixHour()   const { return _dailyMixHour; }
     uint8_t getDailyMixMinute() const { return _dailyMixMinute; }
+
+#if ENABLE_FSM_SIMULATION_TEST
+    void setTestDateTime(uint16_t year, uint8_t month, uint8_t day,
+                         uint8_t hour, uint8_t minute);
+#endif
 
 private:
 

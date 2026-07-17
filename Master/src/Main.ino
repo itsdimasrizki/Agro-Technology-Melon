@@ -5,6 +5,11 @@
 
 #include "config/PinConfig.h"
 #include "config/ConfigManager.h"
+#include "TestFlags.h"
+#include "data/FSMStateSimulationData.h"
+#include "data/FullSystemIntegrationTestData.h"
+#include "data/MQTTConfigurationTestData.h"
+#include "data/RelayHardwareTestData.h"
 
 #include "actuators/RelayManager.h"
 
@@ -136,6 +141,33 @@ void resetAppNVSOnFirmwareChange() {
 
     logLine("INFO", "NVS", "app_config=reset reason=new_firmware");
 }
+
+#if ENABLE_RELAY_HARDWARE_TEST
+void runRelayHardwareTest() {
+    static uint8_t relayIndex = 0;
+    static bool relayOn = false;
+    static unsigned long lastChange = 0;
+
+    unsigned long now = millis();
+    unsigned long interval = relayOn ? RELAY_TEST_ON_MS : RELAY_TEST_OFF_MS;
+
+    if (now - lastChange < interval) {
+        return;
+    }
+
+    RelayChannel channel = RELAY_HARDWARE_TEST_SEQUENCE[relayIndex];
+    if (relayOn) {
+        relay.off(channel);
+        relayOn = false;
+        relayIndex = (relayIndex + 1) % RELAY_HARDWARE_TEST_COUNT;
+    } else {
+        relay.on(channel);
+        relayOn = true;
+    }
+
+    lastChange = now;
+}
+#endif
 
 const char* stateToString(FertigationState state) {
     switch (state) {
@@ -335,11 +367,24 @@ void setup() {
     resetAppNVSOnFirmwareChange();
 
     configManager.begin();
+#if ENABLE_FSM_SIMULATION_TEST
+    loadFSMStateSimulationConfiguration(configManager);
+#elif ENABLE_FULL_SYSTEM_TEST
+    loadFullSystemIntegrationTestConfiguration(configManager);
+#elif ENABLE_MQTT_CONFIGURATION_TEST
+    loadMQTTConfigurationTestData(configManager);
+#endif
     logBootStep("CONFIG", configManager.isConfigured() ? "configured" : "waiting_config");
 
     relay.begin();
     logBootStep("RELAY", "ready");
 
+#if ENABLE_RELAY_HARDWARE_TEST
+    logLine("INFO", "TEST", "mode=relay_hardware");
+    return;
+#endif
+
+#if !ENABLE_FSM_SIMULATION_TEST
     flowA.begin(flowAISR);
     flowB.begin(flowBISR);
     flowIrrig.begin(flowIrrigISR);
@@ -359,7 +404,7 @@ void setup() {
 
     waterTemp.begin();
     logBootStep("TEMP", "ready");
-    
+
     rtcManager.begin();
     rtcManager.setPlantingDate(configManager.getPlantYear(), configManager.getPlantMonth(), configManager.getPlantDay());
     rtcManager.setDailyMixSchedule(configManager.getDailyMixHour(), configManager.getDailyMixMinute());
@@ -379,31 +424,59 @@ void setup() {
 
     soilHealth.begin();
     logBootStep("SOIL", modeToString(soilHealth.getMode()));
+#else
+    rtcManager.setPlantingDate(configManager.getPlantYear(), configManager.getPlantMonth(), configManager.getPlantDay());
+    rtcManager.setDailyMixSchedule(configManager.getDailyMixHour(), configManager.getDailyMixMinute());
+    rtcManager.setTestDateTime(2026, 7, 17, configManager.getDailyMixHour(), configManager.getDailyMixMinute());
+    recovery.begin();
+    logBootStep("RECOVERY", "ready");
+    logBootStep("RTC", "test_ready");
+    logBootStep("SOIL", "test_ready");
+#endif
 
     fsm.begin();
     logStateEvent(fsm.getState(), fsm.getError());
 
+#if !ENABLE_ANY_TEST_MODE
     mqtt.begin();
     logConnectionEvent(mqtt.isConnected());
+#else
+    logLine("INFO", "TEST", "mqtt=disabled");
+#endif
 
     logLine("INFO", "BOOT", "system=ready");
     delay(5000);
 }
 
 void loop() {
+#if ENABLE_RELAY_HARDWARE_TEST
+    runRelayHardwareTest();
+    return;
+#endif
+
+#if ENABLE_FSM_SIMULATION_TEST
+    sensorManager.setTestData(getFSMStateSimulationData(fsm.getState()));
+#endif
+
     fsm.update();
 
     SensorData sensorData = sensorManager.getData();
+#if !ENABLE_ANY_TEST_MODE
     mqtt.update(sensorData, fsm.getState(), fsm.getError());
+#endif
 
     static FertigationState lastLoggedState = fsm.getState();
     static ErrorCode lastLoggedError = fsm.getError();
+#if !ENABLE_ANY_TEST_MODE
     static bool lastLoggedMqtt = mqtt.isConnected();
+#endif
     static unsigned long lastStatusLog = 0;
 
     FertigationState currentState = fsm.getState();
     ErrorCode currentError = fsm.getError();
+#if !ENABLE_ANY_TEST_MODE
     bool mqttConnected = mqtt.isConnected();
+#endif
 
     if (currentState != lastLoggedState || currentError != lastLoggedError) {
         lastLoggedState = currentState;
@@ -411,10 +484,12 @@ void loop() {
         logStateEvent(currentState, currentError);
     }
 
+#if !ENABLE_ANY_TEST_MODE
     if (mqttConnected != lastLoggedMqtt) {
         lastLoggedMqtt = mqttConnected;
         logConnectionEvent(mqttConnected);
     }
+#endif
 
     if (millis() - lastStatusLog >= STATUS_LOG_INTERVAL_MS) {
         lastStatusLog = millis();

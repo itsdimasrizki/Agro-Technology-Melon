@@ -25,6 +25,10 @@ data{}
 }
 
 void SensorManager::update() {
+#if ENABLE_FSM_SIMULATION_TEST
+    return;
+#endif
+
     unsigned long now = millis();
 
     switch (_readState) {
@@ -102,3 +106,9 @@ SensorManager::getData()
 const {
     return data;
 }
+
+#if ENABLE_FSM_SIMULATION_TEST
+void SensorManager::setTestData(const SensorData& testData) {
+    data = testData;
+}
+#endif

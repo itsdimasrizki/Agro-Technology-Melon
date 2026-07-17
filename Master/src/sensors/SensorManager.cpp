@@ -22,9 +22,20 @@ data{}
     _readState      = STATE_READ_PH;
     _lastStateChange = 0;
     _lastLevelUpdate  = 0;
+#if TEST_MODE_ANY
+    _testDataEnabled = false;
+    _testData = {};
+#endif
 }
 
 void SensorManager::update() {
+#if TEST_MODE_ANY
+    if (_testDataEnabled) {
+        data = _testData;
+        return;
+    }
+#endif
+
     unsigned long now = millis();
 
     switch (_readState) {
@@ -102,3 +113,14 @@ SensorManager::getData()
 const {
     return data;
 }
+
+#if TEST_MODE_ANY
+void SensorManager::setTestData(const SensorData& testData) {
+    _testData = testData;
+    _testDataEnabled = true;
+}
+
+void SensorManager::clearTestData() {
+    _testDataEnabled = false;
+}
+#endif

@@ -15,6 +15,10 @@ bool RTCManager::isOk() const {
 }
 
 void RTCManager::refresh() {
+#if TEST_MODE_ANY
+    if (_testClockEnabled) return;
+#endif
+
     if (!_rtcOk) return;
 
     _dt = rtc.now();
@@ -58,3 +62,15 @@ void RTCManager::setDailyMixSchedule(uint8_t hour, uint8_t minute) {
     _dailyMixHour   = hour;
     _dailyMixMinute = minute;
 }
+
+#if TEST_MODE_ANY
+void RTCManager::setTestClock(const DateTime& dt) {
+    _dt = dt;
+    _rtcOk = true;
+    _testClockEnabled = true;
+}
+
+void RTCManager::clearTestClock() {
+    _testClockEnabled = false;
+}
+#endif

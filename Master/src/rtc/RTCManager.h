@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <RTClib.h>
+#include "../../test/TestFlags.h"
 
 class RTCManager {
 public:
@@ -28,6 +29,11 @@ public:
     void setPlantingDate(uint16_t year, uint8_t month, uint8_t day);
     void setDailyMixSchedule(uint8_t hour, uint8_t minute);
 
+#if TEST_MODE_ANY
+    void setTestClock(const DateTime& dt);
+    void clearTestClock();
+#endif
+
     uint8_t getDailyMixHour()   const { return _dailyMixHour; }
     uint8_t getDailyMixMinute() const { return _dailyMixMinute; }
 
@@ -44,6 +50,10 @@ private:
     DateTime _dt;
 
     bool _rtcOk = false;
+
+#if TEST_MODE_ANY
+    bool _testClockEnabled = false;
+#endif
 };
 
 #endif

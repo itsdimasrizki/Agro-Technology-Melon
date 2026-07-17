@@ -1,4 +1,5 @@
 #include <Wire.h>
+#include <ArduinoJson.h>
 
 #include <WiFi.h>
 #include <Preferences.h>
@@ -29,6 +30,24 @@
 #include "communication/ESPNowManager.h"
 
 #include "utils/RecoveryManager.h"
+
+#include "../test/TestFlags.h"
+
+#if ENABLE_FSM_SIMULATION_TEST
+#include "../test/data/FSMStateSimulationData.h"
+#endif
+
+#if ENABLE_RELAY_HARDWARE_TEST
+#include "../test/data/RelayHardwareTestData.h"
+#endif
+
+#if ENABLE_FULL_SYSTEM_TEST
+#include "../test/data/FullSystemIntegrationTestData.h"
+#endif
+
+#if ENABLE_MQTT_CONFIGURATION_TEST || ENABLE_FULL_SYSTEM_TEST || ENABLE_FSM_SIMULATION_TEST
+#include "../test/data/MQTTConfigurationTestData.h"
+#endif
 
 RelayManager relay;
 
@@ -325,6 +344,218 @@ void IRAM_ATTR flowIrrigISR() {
     flowIrrig.recordPulseFromISR();
 }
 
+#if ENABLE_MQTT_CONFIGURATION_TEST || ENABLE_FULL_SYSTEM_TEST || ENABLE_FSM_SIMULATION_TEST
+static bool loadJsonPayload(const char* payload, JsonDocument& doc) {
+    char buffer[1024];
+    strncpy_P(buffer, payload, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    return deserializeJson(doc, buffer) == DeserializationError::Ok;
+}
+
+static void applySystemPayload(const char* payload) {
+    JsonDocument doc;
+    if (!loadJsonPayload(payload, doc)) return;
+
+    float targetFill = doc["target_fill_volume"] | configManager.getTargetFillVolume();
+    float tankCap = doc["tank_capacity_liter"] | configManager.getTankCapacityLiter();
+    if (tankCap > 0.0f && targetFill > tankCap) targetFill = tankCap;
+
+    configManager.setSystemConfig(
+        doc["total_plants"] | configManager.getTotalPlants(),
+        doc["max_consumption_per_plant"] | configManager.getMaxConsumptionPerPlant(),
+        targetFill,
+        tankCap,
+        doc["tank_height_cm"] | configManager.getTankHeightCM(),
+        doc["tank_diameter_cm"] | configManager.getTankDiameterCM()
+    );
+}
+
+static void applySchedulePayload(const char* payload) {
+    JsonDocument doc;
+    if (!loadJsonPayload(payload, doc)) return;
+
+    configManager.setScheduleConfig(
+        doc["plant_year"] | configManager.getPlantYear(),
+        doc["plant_month"] | configManager.getPlantMonth(),
+        doc["plant_day"] | configManager.getPlantDay(),
+        doc["daily_mix_hour"] | configManager.getDailyMixHour(),
+        doc["daily_mix_minute"] | configManager.getDailyMixMinute()
+    );
+}
+
+static void applyPPMPayload(const char* payload) {
+    JsonDocument doc;
+    if (!loadJsonPayload(payload, doc)) return;
+
+    configManager.setPPMConfig(
+        doc["ppm_tolerance"] | configManager.getPPMTolerance(),
+        doc["initial_a"] | configManager.getInitialNutrientA(),
+        doc["initial_b"] | configManager.getInitialNutrientB()
+    );
+}
+
+static void applyPHPayload(const char* payload) {
+    JsonDocument doc;
+    if (!loadJsonPayload(payload, doc)) return;
+
+    configManager.setPHConfig(
+        doc["min_ph"] | configManager.getDefaultMinPH(),
+        doc["max_ph"] | configManager.getDefaultMaxPH()
+    );
+}
+
+static void applyRecipePayload(const char* payload) {
+    JsonDocument doc;
+    if (!loadJsonPayload(payload, doc)) return;
+
+    JsonArrayConst arr = doc["stages"].as<JsonArrayConst>();
+    if (arr.isNull()) return;
+
+    RecipeStageConfig stages[MAX_RECIPE_STAGES];
+    uint8_t count = 0;
+    for (JsonObjectConst s : arr) {
+        if (count >= MAX_RECIPE_STAGES) break;
+        stages[count].maxAgeDays = s["max_age_days"] | (uint16_t)0;
+        stages[count].targetPPM = s["target_ppm"] | 0.0f;
+        stages[count].minPH = s["min_ph"] | configManager.getDefaultMinPH();
+        stages[count].maxPH = s["max_ph"] | configManager.getDefaultMaxPH();
+        count++;
+    }
+
+    if (count > 0) {
+        configManager.setRecipeStages(stages, count);
+    }
+}
+
+static void applyIrrigationPayload(const char* payload) {
+    JsonDocument doc;
+    if (!loadJsonPayload(payload, doc)) return;
+
+    JsonArrayConst arr = doc["stages"].as<JsonArrayConst>();
+    if (arr.isNull()) return;
+
+    IrrigationStageConfig stages[MAX_IRRIGATION_STAGES];
+    uint8_t count = 0;
+    for (JsonObjectConst s : arr) {
+        if (count >= MAX_IRRIGATION_STAGES) break;
+        stages[count].maxAgeDays = s["max_age_days"] | (uint16_t)0;
+        stages[count].dryThreshold = s["dry_threshold"] | (uint16_t)3900;
+        stages[count].wetThreshold = s["wet_threshold"] | (uint16_t)3650;
+        count++;
+    }
+
+    if (count > 0) {
+        configManager.setIrrigationStages(stages, count);
+    }
+}
+
+static void applyTimerIrrigationPayload(const char* payload) {
+    JsonDocument doc;
+    if (!loadJsonPayload(payload, doc)) return;
+
+    JsonArrayConst arr = doc["slots"].as<JsonArrayConst>();
+    if (arr.isNull()) return;
+
+    IrrigationSlot slots[MAX_IRRIG_SLOTS];
+    uint8_t count = 0;
+    for (JsonObjectConst s : arr) {
+        if (count >= MAX_IRRIG_SLOTS) break;
+        slots[count].hour = s["hour"] | (uint8_t)0;
+        slots[count].minute = s["minute"] | (uint8_t)0;
+        count++;
+    }
+
+    configManager.setTimerIrrigationConfig(slots, count);
+}
+
+static void applyMixScheduleExtPayload(const char* payload) {
+    JsonDocument doc;
+    if (!loadJsonPayload(payload, doc)) return;
+
+    configManager.setStirSchedule(
+        doc["stir_evening_hour"] | configManager.getStirEveningHour(),
+        doc["stir_evening_minute"] | configManager.getStirEveningMinute(),
+        (doc["stir_duration_seconds"] | (uint32_t)(configManager.getStirDurationMs() / 1000UL)) * 1000UL
+    );
+}
+
+static void applyHardcodedMQTTConfiguration() {
+#if ENABLE_FULL_SYSTEM_TEST
+    applySystemPayload(FullSystemIntegrationTestData::SYSTEM_PAYLOAD);
+    applySchedulePayload(FullSystemIntegrationTestData::SCHEDULE_PAYLOAD);
+    applyPPMPayload(FullSystemIntegrationTestData::PPM_PAYLOAD);
+    applyPHPayload(FullSystemIntegrationTestData::PH_PAYLOAD);
+    applyRecipePayload(FullSystemIntegrationTestData::RECIPE_PAYLOAD);
+    applyIrrigationPayload(FullSystemIntegrationTestData::IRRIGATION_PAYLOAD);
+    applyTimerIrrigationPayload(FullSystemIntegrationTestData::TIMER_IRRIGATION_PAYLOAD);
+    applyMixScheduleExtPayload(FullSystemIntegrationTestData::MIX_SCHEDULE_EXT_PAYLOAD);
+#else
+    applySystemPayload(MQTTConfigurationTestData::SYSTEM_PAYLOAD);
+    applySchedulePayload(MQTTConfigurationTestData::SCHEDULE_PAYLOAD);
+    applyPPMPayload(MQTTConfigurationTestData::PPM_PAYLOAD);
+    applyPHPayload(MQTTConfigurationTestData::PH_PAYLOAD);
+    applyRecipePayload(MQTTConfigurationTestData::RECIPE_PAYLOAD);
+    applyIrrigationPayload(MQTTConfigurationTestData::IRRIGATION_PAYLOAD);
+    applyTimerIrrigationPayload(MQTTConfigurationTestData::TIMER_IRRIGATION_PAYLOAD);
+    applyMixScheduleExtPayload(MQTTConfigurationTestData::MIX_SCHEDULE_EXT_PAYLOAD);
+#endif
+
+    rtcManager.setPlantingDate(configManager.getPlantYear(), configManager.getPlantMonth(), configManager.getPlantDay());
+    rtcManager.setDailyMixSchedule(configManager.getDailyMixHour(), configManager.getDailyMixMinute());
+    waterLevel.setTankCapacity(configManager.getTankCapacityLiter());
+    waterLevel.setTankHeight(configManager.getTankHeightCM());
+    waterLevel.setTankDiameter(configManager.getTankDiameterCM());
+}
+#endif
+
+#if TEST_MODE_ANY
+static void setupTestClockIfNeeded() {
+#if ENABLE_FSM_SIMULATION_TEST
+    rtcManager.setTestClock(DateTime(2026, 7, 2, configManager.getDailyMixHour(), configManager.getDailyMixMinute(), 0));
+#elif ENABLE_FULL_SYSTEM_TEST || ENABLE_MQTT_CONFIGURATION_TEST
+    if (!rtcManager.isOk()) {
+        rtcManager.setTestClock(DateTime(2026, 7, 2, configManager.getDailyMixHour(), configManager.getDailyMixMinute(), 0));
+    }
+#endif
+}
+#endif
+
+#if ENABLE_RELAY_HARDWARE_TEST
+static void runRelayHardwareTest() {
+    static uint8_t relayIndex = 0;
+    static bool relayOn = false;
+    static unsigned long lastChangeMs = 0;
+
+    unsigned long now = millis();
+    unsigned long interval = relayOn
+        ? RelayHardwareTestData::ON_DURATION_MS
+        : RelayHardwareTestData::OFF_DURATION_MS;
+
+    if (now - lastChangeMs < interval) return;
+    lastChangeMs = now;
+
+    RelayChannel channel = RelayHardwareTestData::RELAYS[relayIndex];
+    if (relayOn) {
+        relay.off(channel);
+        Serial.printf("t=%010lu | INFO  | TEST     | %s=off\n", now, RelayHardwareTestData::RELAY_NAMES[relayIndex]);
+        relayOn = false;
+        relayIndex = (relayIndex + 1) % RelayHardwareTestData::RELAY_COUNT;
+    } else {
+        channel = RelayHardwareTestData::RELAYS[relayIndex];
+        relay.on(channel);
+        Serial.printf("t=%010lu | INFO  | TEST     | %s=on\n", now, RelayHardwareTestData::RELAY_NAMES[relayIndex]);
+        relayOn = true;
+    }
+}
+#endif
+
+#if ENABLE_FSM_SIMULATION_TEST
+static void updateFSMTestData() {
+    SensorData data = FSMStateSimulationData::dataForState(fsm.getState(), configManager);
+    sensorManager.setTestData(data);
+}
+#endif
+
 void setup() {
     Serial.begin(115200);
     // Tunggu USB CDC siap (wajib untuk ESP32-S3 USB CDC)
@@ -335,10 +566,18 @@ void setup() {
     resetAppNVSOnFirmwareChange();
 
     configManager.begin();
+#if ENABLE_MQTT_CONFIGURATION_TEST || ENABLE_FULL_SYSTEM_TEST || ENABLE_FSM_SIMULATION_TEST
+    applyHardcodedMQTTConfiguration();
+#endif
     logBootStep("CONFIG", configManager.isConfigured() ? "configured" : "waiting_config");
 
     relay.begin();
     logBootStep("RELAY", "ready");
+
+#if ENABLE_RELAY_HARDWARE_TEST
+    logLine("INFO", "TEST", "mode=relay_hardware");
+    return;
+#endif
 
     flowA.begin(flowAISR);
     flowB.begin(flowBISR);
@@ -363,6 +602,9 @@ void setup() {
     rtcManager.begin();
     rtcManager.setPlantingDate(configManager.getPlantYear(), configManager.getPlantMonth(), configManager.getPlantDay());
     rtcManager.setDailyMixSchedule(configManager.getDailyMixHour(), configManager.getDailyMixMinute());
+#if TEST_MODE_ANY
+    setupTestClockIfNeeded();
+#endif
     logBootStep("RTC", rtcManager.isOk() ? "ready" : "error");
 
     recovery.begin();
@@ -380,30 +622,56 @@ void setup() {
     soilHealth.begin();
     logBootStep("SOIL", modeToString(soilHealth.getMode()));
 
+#if ENABLE_FSM_SIMULATION_TEST
+    updateFSMTestData();
+    logLine("INFO", "TEST", "mode=fsm_simulation");
+#elif ENABLE_FULL_SYSTEM_TEST
+    logLine("INFO", "TEST", "mode=full_system");
+#elif ENABLE_MQTT_CONFIGURATION_TEST
+    logLine("INFO", "TEST", "mode=mqtt_configuration");
+#endif
+
     fsm.begin();
     logStateEvent(fsm.getState(), fsm.getError());
 
+#if !TEST_MODE_ANY
     mqtt.begin();
     logConnectionEvent(mqtt.isConnected());
+#endif
 
     logLine("INFO", "BOOT", "system=ready");
     delay(5000);
 }
 
 void loop() {
+#if ENABLE_RELAY_HARDWARE_TEST
+    runRelayHardwareTest();
+    return;
+#endif
+
+#if ENABLE_FSM_SIMULATION_TEST
+    updateFSMTestData();
+#endif
+
     fsm.update();
 
     SensorData sensorData = sensorManager.getData();
+#if !TEST_MODE_ANY
     mqtt.update(sensorData, fsm.getState(), fsm.getError());
+#endif
 
     static FertigationState lastLoggedState = fsm.getState();
     static ErrorCode lastLoggedError = fsm.getError();
+#if !TEST_MODE_ANY
     static bool lastLoggedMqtt = mqtt.isConnected();
+#endif
     static unsigned long lastStatusLog = 0;
 
     FertigationState currentState = fsm.getState();
     ErrorCode currentError = fsm.getError();
+#if !TEST_MODE_ANY
     bool mqttConnected = mqtt.isConnected();
+#endif
 
     if (currentState != lastLoggedState || currentError != lastLoggedError) {
         lastLoggedState = currentState;
@@ -411,10 +679,12 @@ void loop() {
         logStateEvent(currentState, currentError);
     }
 
+#if !TEST_MODE_ANY
     if (mqttConnected != lastLoggedMqtt) {
         lastLoggedMqtt = mqttConnected;
         logConnectionEvent(mqttConnected);
     }
+#endif
 
     if (millis() - lastStatusLog >= STATUS_LOG_INTERVAL_MS) {
         lastStatusLog = millis();

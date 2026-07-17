@@ -7,6 +7,7 @@
 #include "sensors/WaterLevel.h"
 #include "../communication/ESPNowManager.h"
 #include "sensors/FlowMeter.h"
+#include "../../test/TestFlags.h"
 
 struct SensorData {
     float temperature;
@@ -40,8 +41,18 @@ public:
 
     SensorData getData() const;
 
+#if TEST_MODE_ANY
+    void setTestData(const SensorData& testData);
+    void clearTestData();
+#endif
+
 private:
     SensorData data;
+
+#if TEST_MODE_ANY
+    bool _testDataEnabled;
+    SensorData _testData;
+#endif
 
     WaterTempSensor& tempSensor;
     PHSensor& phSensor;

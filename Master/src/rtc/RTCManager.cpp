@@ -45,8 +45,12 @@ DateTime RTCManager::now() {
 
 uint16_t RTCManager::getPlantAgeDays() {
     TimeSpan age = _dt - plantingDate;
+    int16_t elapsedDays = age.days();
 
-    return age.days();
+    if (elapsedDays < 0) return 0;
+
+    // SOP memakai hari tanam sebagai Hari 1, bukan Hari 0.
+    return static_cast<uint16_t>(elapsedDays + 1);
 }
 
 uint8_t RTCManager::getDay() {

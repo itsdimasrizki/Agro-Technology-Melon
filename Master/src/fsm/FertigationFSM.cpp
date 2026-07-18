@@ -2,6 +2,14 @@
 #include "../config/Constants.h"
 #include "../config/SystemConfig.h"
 
+static bool isMinuteInsideWindow(uint16_t nowMinute, uint16_t startMinute, uint16_t endMinute) {
+    if (startMinute == endMinute) return false;
+    if (startMinute < endMinute) {
+        return nowMinute >= startMinute && nowMinute < endMinute;
+    }
+    return nowMinute >= startMinute || nowMinute < endMinute;
+}
+
 FertigationFSM::FertigationFSM(
     SensorManager&     sensors,
     RelayManager&      relays,
@@ -54,8 +62,6 @@ soilHealthMonitor(soilHealth)
     _irrigJustCompleted = false;
     _activeSlotIdx = -1;
     _timerSlotRunning = false;
-    _timerTargetML = 0.0f;
-    _lastSlotMinute = 0xFFFF;
 }
 
 //! Begin
@@ -662,8 +668,23 @@ void FertigationFSM::handleFillWater() {
         closeWaterInlet();
         if (millis() - lastLevelChangeTime >= WATER_LEVEL_STABLE_TIMEOUT) {
             stopFillStirrer();
-            // Hitung dosis nutrisi SETELAH tangki penuh — full dose, tanpa scaling rasio
             prepareDailyRecipe();
+            if (isPPMAcceptableForUse()) {
+                relayManager.off(RELAY_PUMP_A);
+                relayManager.off(RELAY_SOLENOID_A);
+                relayManager.off(RELAY_PUMP_B);
+                relayManager.off(RELAY_SOLENOID_B);
+                if (!isPPMInRange()) {
+                    setWarning(ErrorCode::OVER_PPM);
+                } else if (currentError == ErrorCode::OVER_PPM) {
+                    clearWarning();
+                }
+                logStateAction("[FSM] PPM already acceptable after fill — skip initial dosing");
+                gotoReady();
+                return;
+            }
+
+            // PPM belum cukup, lanjut dosing awal A/B.
             changeState(FertigationState::PRE_MIX_A);
         }
     } else {
@@ -1024,51 +1045,34 @@ void FertigationFSM::handleIrrigation() {
 void FertigationFSM::handleTimerIrrigation() {
     uint8_t rtcHour = rtcManager.getHour();
     uint8_t rtcMinute = rtcManager.getMinute();
+    uint16_t nowMinute = static_cast<uint16_t>(rtcHour) * 60U + rtcMinute;
+    int8_t activeSlot = -1;
 
-    if (!_timerSlotRunning) {
-        uint8_t numSlots = configManager.getNumIrrigationSlots();
-        if (numSlots == 0) return;
+    uint8_t numSlots = configManager.getNumIrrigationSlots();
+    for (uint8_t i = 0; i < numSlots; i++) {
+        IrrigationSlot slot = configManager.getIrrigationSlot(i);
+        uint16_t startMinute = static_cast<uint16_t>(slot.startHour) * 60U + slot.startMinute;
+        uint16_t endMinute = static_cast<uint16_t>(slot.endHour) * 60U + slot.endMinute;
 
-        // Cegah pemicuan berulang pada menit yang sama
-        if (rtcMinute == _lastSlotMinute) {
-            return;
+        if (isMinuteInsideWindow(nowMinute, startMinute, endMinute)) {
+            activeSlot = i;
+            break;
         }
+    }
 
-        int8_t triggeredSlot = -1;
-        for (uint8_t i = 0; i < numSlots; i++) {
-            IrrigationSlot slot = configManager.getIrrigationSlot(i);
-            if (slot.hour == rtcHour && slot.minute == rtcMinute) {
-                triggeredSlot = i;
-                break;
-            }
-        }
+    if (activeSlot >= 0 && !_timerSlotRunning) {
+        irrigFlow.reset();
+        startIrrigationOutput();
+        _timerSlotRunning = true;
+        _activeSlotIdx = activeSlot;
+        return;
+    }
 
-        if (triggeredSlot != -1) {
-            // Hitung target volume untuk slot ini dalam mL
-            float dailyVolML = configManager.getMaxConsumptionPerPlant() * 1000.0f * configManager.getTotalPlants();
-            _timerTargetML = dailyVolML / numSlots;
-
-            // Reset flow meter irigasi
-            irrigFlow.reset();
-
-            startIrrigationOutput();
-
-            _timerSlotRunning = true;
-            _activeSlotIdx = triggeredSlot;
-            _lastSlotMinute = rtcMinute;
-        }
-    } else {
-        // Sedang irigasi timer, monitor flow sensor
-        float currentVolLiters = irrigFlow.getVolumeLiter();
-        float targetLiters = _timerTargetML / 1000.0f;
-
-        if (currentVolLiters >= targetLiters) {
-            stopIrrigationOutput();
-
-            _timerSlotRunning = false;
-            _activeSlotIdx = -1;
-            _irrigJustCompleted = true; // Pemicu evaluation pasca-watering pada SoilHealthMonitor
-        }
+    if (activeSlot < 0 && _timerSlotRunning) {
+        stopIrrigationOutput();
+        _timerSlotRunning = false;
+        _activeSlotIdx = -1;
+        _irrigJustCompleted = true; // Pemicu evaluation pasca-watering pada SoilHealthMonitor
     }
 }
 
@@ -1142,79 +1146,89 @@ void FertigationFSM::logRecovery(
 
 // ============================================================
 // STATE DIAGRAM
-//
-// Startup (normal)
-//      |
-//      v
-// WAIT_DAILY_MIX
-//      | jam DAILY_MIX_HOUR:DAILY_MIX_MINUTE && plantAgeDays != lastMixDay
-//      v
-// PREPARE_DAILY_MIX
-//      |
-//      v
-// FILL_WATER
-//      | sensor.tankVolume >= configManager.getTargetFillVolume()
-//      |   → solenoid inlet OFF
-//      |   → level stabil (tidak berubah >= WATER_LEVEL_STABLE_TIMEOUT)
-//      |   → stirrer OFF
-//      v
-// PRE_MIX_A
-//      |
-//      v
-// ADD_NUTRIENT_A
-//      | flowA >= targetNutrientA
-//      v
-// MIX_A (MIX_A_TIME)
-//      |
-//      v
-// PRE_MIX_B
-//      |
-//      v
-// ADD_NUTRIENT_B
-//      | flowB >= targetNutrientB
-//      v
-// MIX_B (MIX_B_TIME)
-//      |
-//      v
-// VALIDATE
-//      | ppm OK
-//      v
-// READY
-//
-// VALIDATE
-//      | ppm low
-//      v
-// CORRECT_PPM
-//      | dosis tercapai
-//      v
-// PRE_MIX_CORRECTION
-//      |
-//      v
-// CORRECTION_MIX (CORRECTION_MIX_TIME)
-//      |
-//      v-- gotoPostCorrection() --
-//      | correctionOrigin = VALIDATE → VALIDATE
-//      | correctionOrigin = PRE_IRRIGATION_VALIDATE → PRE_IRRIGATION_VALIDATE
-//
-// READY
-//      | soilADC >= dryThreshold
-//      v
-// PRE_IRRIGATION_MIX (PRE_IRRIGATION_MIX_TIME)
-//      |
-//      v
-// PRE_IRRIGATION_VALIDATE
-//      | ppm+pH OK
-//      v
-// IRRIGATION
-//      | soilADC <= wetThreshold
-//      v
-// READY
-//
-// Any timeout / overdose / mixer dry-run / pH out of range / correction failed
-//      |
-//      v
-// ERROR
-//      | auto-recover (recoverFromError)
-//      v
-// lastStateBeforeError
-// ============================================================
+// //
+//   IDLE
+//    |
+//    | config hardcode sudah loaded
+//    v
+//   WAIT_DAILY_MIX
+//    |
+//    | RTC == daily_mix_hour:daily_mix_minute
+//    v
+//   PREPARE_DAILY_MIX
+//    |
+//    v
+//   FILL_WATER
+//    |
+//    | tank_volume >= target_fill_volume
+//    | level stabil
+//    v
+//   AMBIL RECIPE HARI INI
+//    |
+//    v
+//   CEK PPM AWAL
+//    |
+//    +-- PPM sudah cukup?
+//    |      |
+//    |      +-- YA --> READY
+//    |
+//    +-- TIDAK
+//           |
+//           v
+//      PRE_MIX_A
+//           |
+//           v
+//      ADD_NUTRIENT_A
+//           |
+//           v
+//      MIX_A
+//           |
+//           v
+//      PRE_MIX_B
+//           |
+//           v
+//      ADD_NUTRIENT_B
+//           |
+//           v
+//      MIX_B
+//           |
+//           v
+//      VALIDATE PPM
+//           |
+//           +-- PPM cukup --> READY
+//           |
+//           +-- PPM kurang --> PRE_MIX_CORRECTION
+//                                 |
+//                                 v
+//                            CORRECT_PPM
+//                                 |
+//                                 v
+//                            CORRECTION_MIX
+//                                 |
+//                                 v
+//                            VALIDATE PPM
+
+//   Saat sudah READY:
+
+//   READY
+//    |
+//    +-- Timer irrigation mode aktif
+//    |      |
+//    |      +-- RTC masuk window timer --> IRIGASI ON
+//    |      |
+//    |      +-- RTC keluar window timer --> IRIGASI OFF
+//    |
+//    +-- Stir sore sesuai jam config
+//    |
+//    +-- MQTT publish telemetry kalau WiFi ada
+
+//   Jadi besok kalau setelah FILL_WATER PPM sudah masuk target, dia langsung:
+
+//   FILL_WATER
+//    |
+//   CEK PPM AWAL
+//    |
+//   READY
+
+//   Tanpa dosing A/B.
+  // ============================================================

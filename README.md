@@ -86,6 +86,95 @@ Agro-Technology-Melon/
 
 ---
 
+## STATE
+'''ext
+  IDLE
+   |
+   | config hardcode sudah loaded
+   v
+  WAIT_DAILY_MIX
+   |
+   | RTC == daily_mix_hour:daily_mix_minute
+   v
+  PREPARE_DAILY_MIX
+   |
+   v
+  FILL_WATER
+   |
+   | tank_volume >= target_fill_volume
+   | level stabil
+   v
+  AMBIL RECIPE HARI INI
+   |
+   v
+  CEK PPM AWAL
+   |
+   +-- PPM sudah cukup?
+   |      |
+   |      +-- YA --> READY
+   |
+   +-- TIDAK
+          |
+          v
+     PRE_MIX_A
+          |
+          v
+     ADD_NUTRIENT_A
+          |
+          v
+     MIX_A
+          |
+          v
+     PRE_MIX_B
+          |
+          v
+     ADD_NUTRIENT_B
+          |
+          v
+     MIX_B
+          |
+          v
+     VALIDATE PPM
+          |
+          +-- PPM cukup --> READY
+          |
+          +-- PPM kurang --> PRE_MIX_CORRECTION
+                                |
+                                v
+                           CORRECT_PPM
+                                |
+                                v
+                           CORRECTION_MIX
+                                |
+                                v
+                           VALIDATE PPM
+
+  Saat sudah READY:
+
+  READY
+   |
+   +-- Timer irrigation mode aktif
+   |      |
+   |      +-- RTC masuk window timer --> IRIGASI ON
+   |      |
+   |      +-- RTC keluar window timer --> IRIGASI OFF
+   |
+   +-- Stir sore sesuai jam config
+   |
+   +-- MQTT publish telemetry kalau WiFi ada
+
+  Jadi besok kalau setelah FILL_WATER PPM sudah masuk target, dia langsung:
+
+  FILL_WATER
+   |
+  CEK PPM AWAL
+   |
+  READY
+
+  Tanpa dosing A/B.
+'''
+
+---
 ## 🛠️ Persyaratan Perangkat Keras
 
 ### 💻 Mikrokontroler

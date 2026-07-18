@@ -23,6 +23,11 @@ struct SensorData {
     float flowB;
 
     float waterLevel;
+
+    uint16_t soilSensor1;
+    uint16_t soilSensor2;
+    uint16_t soilSensor3;
+    uint16_t soilSensor4;
 };
 
 class SensorManager {

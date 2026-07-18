@@ -15,11 +15,12 @@ SoilHealthMonitor::SoilHealthMonitor(ESPNowManager& espNow, ConfigManager& confi
 // begin() -- load mode dari NVS
 // =========================================
 void SoilHealthMonitor::begin() {
-    _prefs.begin(NS_SOIL, true);
-    uint8_t savedMode = _prefs.getUChar("mode", static_cast<uint8_t>(IrrigationMode::HUMIDITY));
-    _prefs.end();
-
-    _mode = static_cast<IrrigationMode>(savedMode);
+#if IRRIGATION_MODE_SOURCE == 1
+    _mode = IrrigationMode::TIMER;
+#else
+    _mode = IrrigationMode::HUMIDITY;
+#endif
+    saveMode();
 }
 
 // =========================================
@@ -59,11 +60,7 @@ void SoilHealthMonitor::update(uint16_t soilADC, bool irrigCompleted, uint16_t c
         _lastEvalMs = now;
         evaluate(soilADC);
 
-        // Auto-switch ke TIMER jika health melewati threshold
-        if (_mode == IrrigationMode::HUMIDITY &&
-            _healthScore <= SOIL_HEALTH_SWITCH_THRESHOLD) {
-            switchToTimerMode();
-        }
+        // Mode irigasi dipilih manual dari SystemConfig.h.
     }
 }
 

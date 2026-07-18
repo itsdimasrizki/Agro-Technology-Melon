@@ -1,5 +1,11 @@
 #include "SensorManager.h"
 
+static uint16_t calculateSoilAverage(const SoilData& soil) {
+    // Sensor 2 currently reads 0 on hardware, so exclude it from control average.
+    uint32_t sum = (uint32_t)soil.sensor1 + soil.sensor3 + soil.sensor4;
+    return (uint16_t)(sum / 3);
+}
+
 SensorManager::SensorManager(
     WaterTempSensor& temp,
     PHSensor& ph,
@@ -96,7 +102,11 @@ void SensorManager::update() {
 
     if (espNow.hasNewData()) {
         SoilData soil = espNow.getData();
-        data.soilADC  = soil.averageRawADC;
+        data.soilSensor1 = soil.sensor1;
+        data.soilSensor2 = soil.sensor2;
+        data.soilSensor3 = soil.sensor3;
+        data.soilSensor4 = soil.sensor4;
+        data.soilADC     = calculateSoilAverage(soil);
         espNow.clearFlag();
     }
 }

@@ -1,6 +1,7 @@
 #include <Wire.h>
 
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include <Preferences.h>
 
 #include "config/PinConfig.h"
@@ -10,6 +11,7 @@
 #include "data/FullSystemIntegrationTestData.h"
 #include "data/MQTTConfigurationTestData.h"
 #include "data/RelayHardwareTestData.h"
+#include "FSMInputData.h"
 
 #include "actuators/RelayManager.h"
 
@@ -307,6 +309,13 @@ void logSystemStatus(const SensorData& data) {
     formatSoilRules(soilRules, sizeof(soilRules), rules);
 
     unsigned long now = millis();
+    bool espNowReceived = espNow.hasReceivedData();
+    unsigned long espNowAge = espNowReceived ? (now - espNow.getLastReceiveTime()) : 0;
+    char espNowSource[18];
+    espNow.getLastSenderMac(espNowSource, sizeof(espNowSource));
+    uint8_t wifiChannel = 0;
+    wifi_second_chan_t wifiSecondChannel = WIFI_SECOND_CHAN_NONE;
+    esp_wifi_get_channel(&wifiChannel, &wifiSecondChannel);
 
     Serial.printf(
         "t=%010lu | INFO  | STATUS   | state=%s error=%s\n",
@@ -336,7 +345,7 @@ void logSystemStatus(const SensorData& data) {
         WiFi.localIP().toString().c_str()
     );
     Serial.printf(
-        "t=%010lu | INFO  | SENSOR   | temp=%.1fC ph=%.2f/%s ppm=%.0f tank=%.1fL soil=%u\n",
+        "t=%010lu | INFO  | SENSOR   | temp=%.1fC ph=%.2f/%s ppm=%.0f tank=%.1fL humidity_avg=%u\n",
         now,
         data.temperature,
         data.ph,
@@ -353,11 +362,23 @@ void logSystemStatus(const SensorData& data) {
         activeRelays
     );
     Serial.printf(
-        "t=%010lu | INFO  | SOIL     | mode=%s health=%u rules=%s\n",
+        "t=%010lu | INFO  | SOIL     | mode=%s health=%u rules=%s master_mac=%s ch=%u espnow_rx=%s rx_count=%lu age_ms=%lu len=%d src=%s s1=%u s2=%u s3=%u s4=%u avg=%u\n",
         now,
         modeToString(soilHealth.getMode()),
         soilHealth.getHealthScore(),
-        soilRules
+        soilRules,
+        WiFi.macAddress().c_str(),
+        wifiChannel,
+        espNowReceived ? "YES" : "NO",
+        (unsigned long)espNow.getPacketCount(),
+        espNowAge,
+        espNow.getLastPacketSize(),
+        espNowSource,
+        data.soilSensor1,
+        data.soilSensor2,
+        data.soilSensor3,
+        data.soilSensor4,
+        data.soilADC
     );
 }
 
@@ -407,6 +428,8 @@ void setup() {
     loadFullSystemIntegrationTestConfiguration(configManager);
 #elif ENABLE_MQTT_CONFIGURATION_TEST
     loadMQTTConfigurationTestData(configManager);
+#else
+    loadHardcodedFSMInputData(configManager);
 #endif
     logBootStep("CONFIG", configManager.isConfigured() ? "configured" : "waiting_config");
 
@@ -456,9 +479,6 @@ void setup() {
     tdsSensor.begin();
     logBootStep("PH_TDS", "ready");
 
-    bool espNowOk = espNow.begin();
-    logBootStep("ESPNOW", espNowOk ? "ready" : "error");
-
     soilHealth.begin();
     logBootStep("SOIL", modeToString(soilHealth.getMode()));
 #else
@@ -480,6 +500,16 @@ void setup() {
     logConnectionEvent(mqtt.isConnected());
 #else
     logLine("INFO", "TEST", "mqtt=disabled");
+#endif
+
+#if !ENABLE_FSM_SIMULATION_TEST
+    bool espNowOk = espNow.begin();
+    logBootStep("ESPNOW", espNowOk ? "ready" : "error");
+    Serial.printf(
+        "t=%010lu | INFO  | ESPNOW   | master_mac=%s\n",
+        millis(),
+        WiFi.macAddress().c_str()
+    );
 #endif
 
     logLine("INFO", "BOOT", "system=ready");

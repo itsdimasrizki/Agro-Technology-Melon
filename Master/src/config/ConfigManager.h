@@ -27,10 +27,12 @@ struct IrrigationStageConfig {
     uint16_t wetThreshold;
 };
 
-// Satu slot jadwal irigasi untuk Timer Fallback mode
+// Satu window jadwal irigasi untuk Timer mode
 struct IrrigationSlot {
-    uint8_t hour;    // jam (0-23)
-    uint8_t minute;  // menit (0-59)
+    uint8_t startHour;    // jam ON (0-23)
+    uint8_t startMinute;  // menit ON (0-59)
+    uint8_t endHour;      // jam OFF (0-23)
+    uint8_t endMinute;    // menit OFF (0-59)
 };
 
 // =========================================

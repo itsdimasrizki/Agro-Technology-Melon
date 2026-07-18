@@ -251,10 +251,8 @@ private:
     bool _irrigJustCompleted = false;
 
     // Tracking slot jadwal yang sedang aktif
-    int8_t        _activeSlotIdx     = -1;   // -1 = tidak ada slot aktif
-    bool          _timerSlotRunning  = false; // apakah sedang dalam sesi irigasi timer
-    float         _timerTargetML     = 0.0f;  // target volume untuk slot ini (mL)
-    unsigned long _lastSlotMinute    = 0xFFFF; // menit terakhir slot yang dipicu (cegah double-trigger)
+    int8_t _activeSlotIdx = -1;       // -1 = tidak ada slot aktif
+    bool   _timerSlotRunning = false; // apakah sedang dalam window irigasi timer
 };
 
 #endif

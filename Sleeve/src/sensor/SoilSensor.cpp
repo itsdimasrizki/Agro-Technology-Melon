@@ -34,8 +34,9 @@ void SoilSensor::update() {
     _data.sensor3 = raw[2];
     _data.sensor4 = raw[3];
 
-    uint32_t sum = (uint32_t)raw[0] + raw[1] + raw[2] + raw[3];
-    _data.averageRawADC = (uint16_t)(sum / 4);
+    // Sensor 2 currently reads 0 on hardware, so exclude it from humidity average.
+    uint32_t sum = (uint32_t)raw[0] + raw[2] + raw[3];
+    _data.averageRawADC = (uint16_t)(sum / 3);
 }
 
 SoilData SoilSensor::getData() const {

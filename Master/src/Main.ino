@@ -11,6 +11,7 @@
 #include "data/FullSystemIntegrationTestData.h"
 #include "data/MQTTConfigurationTestData.h"
 #include "data/RelayHardwareTestData.h"
+#include "FSMInputData.h"
 
 #include "actuators/RelayManager.h"
 
@@ -427,6 +428,8 @@ void setup() {
     loadFullSystemIntegrationTestConfiguration(configManager);
 #elif ENABLE_MQTT_CONFIGURATION_TEST
     loadMQTTConfigurationTestData(configManager);
+#else
+    loadHardcodedFSMInputData(configManager);
 #endif
     logBootStep("CONFIG", configManager.isConfigured() ? "configured" : "waiting_config");
 

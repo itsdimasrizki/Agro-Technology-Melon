@@ -3,6 +3,11 @@
 
 #define DEBUG_SERIAL true
 
+// Mode irigasi:
+// 0 = ESP-NOW soil sensor (humidity threshold)
+// 1 = Timer schedule (pakai data slot di Master/data/TimerIrrigationData.h)
+#define IRRIGATION_MODE_SOURCE 1
+
 // Set true untuk skip jadwal harian dan langsung mix saat startup (mode testing)
 // Set false untuk production — sistem menunggu jadwal jam DAILY_MIX_HOUR
 #define SKIP_DAILY_SCHEDULE false

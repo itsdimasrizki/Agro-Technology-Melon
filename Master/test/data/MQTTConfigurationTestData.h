@@ -68,12 +68,16 @@ static const char TEST_MQTT_PAYLOAD_TIMER_IRRIGATION[] = R"json(
 {
   "slots": [
     {
-      "hour": 6,
-      "minute": 0
+      "start_hour": 6,
+      "start_minute": 0,
+      "end_hour": 6,
+      "end_minute": 2
     },
     {
-      "hour": 17,
-      "minute": 0
+      "start_hour": 17,
+      "start_minute": 0,
+      "end_hour": 17,
+      "end_minute": 2
     }
   ]
 }
@@ -157,8 +161,10 @@ inline void loadMQTTConfigurationTestData(ConfigManager& configManager) {
     uint8_t slotCount = 0;
     for (JsonObjectConst s : timerDoc["slots"].as<JsonArrayConst>()) {
         if (slotCount >= MAX_IRRIG_SLOTS) break;
-        slots[slotCount].hour   = s["hour"].as<uint8_t>();
-        slots[slotCount].minute = s["minute"].as<uint8_t>();
+        slots[slotCount].startHour = s["start_hour"].as<uint8_t>();
+        slots[slotCount].startMinute = s["start_minute"].as<uint8_t>();
+        slots[slotCount].endHour = s["end_hour"].as<uint8_t>();
+        slots[slotCount].endMinute = s["end_minute"].as<uint8_t>();
         slotCount++;
     }
     configManager.setTimerIrrigationConfig(slots, slotCount);

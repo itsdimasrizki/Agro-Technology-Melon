@@ -362,7 +362,7 @@ IrrigationStageConfig ConfigManager::getIrrigationStage(uint8_t index) const {
 
 IrrigationSlot ConfigManager::getIrrigationSlot(uint8_t index) const {
     if (index >= _numIrrigationSlots) {
-        return {0, 0};
+        return {0, 0, 0, 0};
     }
     return _irrigationSlots[index];
 }

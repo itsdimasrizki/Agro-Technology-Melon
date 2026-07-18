@@ -36,10 +36,14 @@ void MQTTManager::begin() {
     );
 
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+#if MQTT_RECEIVE_ENABLED
     mqttClient.setCallback(onMessage);
+#endif
     mqttClient.setBufferSize(1024);
 
-    connectMQTT();
+    if (WiFi.status() == WL_CONNECTED) {
+        connectMQTT();
+    }
 }
 
 // =========================================
@@ -50,8 +54,16 @@ void MQTTManager::update(
     FertigationState fsmState,
     ErrorCode errorCode
 ) {
+    if (WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
     if (!mqttClient.connected()) {
         connectMQTT();
+    }
+
+    if (!mqttClient.connected()) {
+        return;
     }
 
     mqttClient.loop();
@@ -491,6 +503,25 @@ void MQTTManager::handleConfigSchedule(const JsonDocument& doc) {
 void MQTTManager::connectWiFi() {
     if (WiFi.status() == WL_CONNECTED) return;
 
+#if !WIFI_BLOCKING_PORTAL_ENABLED
+    WiFi.mode(WIFI_STA);
+    WiFi.begin();
+    unsigned long startMs = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startMs < 3000UL) {
+        delay(100);
+    }
+
+    Serial.printf(
+        "t=%010lu | %s | WIFI     | connected=%s status=%d ip=%s mode=non_blocking\n",
+        millis(),
+        WiFi.status() == WL_CONNECTED ? "INFO " : "WARN ",
+        WiFi.status() == WL_CONNECTED ? "true" : "false",
+        WiFi.status(),
+        WiFi.localIP().toString().c_str()
+    );
+    return;
+#endif
+
     static const char* customCSS = R"rawhtml(
 <style>
   body { background-color: #f1f8e9; font-family: sans-serif; color: #1b5e20; margin: 0; padding: 0; }
@@ -535,6 +566,7 @@ void MQTTManager::connectWiFi() {
 // =========================================
 void MQTTManager::connectMQTT() {
     if (mqttClient.connected()) return;
+    if (WiFi.status() != WL_CONNECTED) return;
 
     wifiClient.setInsecure();
 
@@ -542,6 +574,7 @@ void MQTTManager::connectMQTT() {
 
     if (ok) {
         Serial.printf("t=%010lu | INFO  | MQTT     | connected=true\n", millis());
+#if MQTT_RECEIVE_ENABLED
         mqttClient.subscribe(TOPIC_CMD);
         mqttClient.subscribe(TOPIC_CFG_PPM);
         mqttClient.subscribe(TOPIC_CFG_PH);
@@ -553,6 +586,9 @@ void MQTTManager::connectMQTT() {
         mqttClient.subscribe(TOPIC_CFG_TIMER_IRRIG);
         mqttClient.subscribe(TOPIC_CFG_MIX_EXT);
         mqttClient.subscribe(TOPIC_CMD_SOIL_RESET);
+#else
+        Serial.printf("t=%010lu | INFO  | MQTT     | mode=publish_only receive=disabled\n", millis());
+#endif
     } else {
         Serial.printf(
             "t=%010lu | WARN  | MQTT     | connected=false state=%d wifi=%s\n",
@@ -627,8 +663,10 @@ void MQTTManager::handleConfigTimerIrrigation(const JsonDocument& doc) {
 
     for (JsonObjectConst s : arr) {
         if (count >= MAX_IRRIG_SLOTS) break;
-        slots[count].hour   = s["hour"]   | (uint8_t)0;
-        slots[count].minute = s["minute"] | (uint8_t)0;
+        slots[count].startHour = s["start_hour"] | s["hour"] | (uint8_t)0;
+        slots[count].startMinute = s["start_minute"] | s["minute"] | (uint8_t)0;
+        slots[count].endHour = s["end_hour"] | slots[count].startHour;
+        slots[count].endMinute = s["end_minute"] | slots[count].startMinute;
         count++;
     }
 

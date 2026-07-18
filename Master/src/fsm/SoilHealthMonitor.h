@@ -7,6 +7,11 @@
 #include "../communication/ESPNowManager.h"
 #include "../config/ConfigManager.h"
 #include "../config/Constants.h"
+#include "../config/SystemConfig.h"
+
+#if IRRIGATION_MODE_SOURCE != 0 && IRRIGATION_MODE_SOURCE != 1
+#error "IRRIGATION_MODE_SOURCE must be 0 (ESP-NOW soil sensor) or 1 (timer schedule)"
+#endif
 
 // =========================================
 // Mode irigasi yang aktif saat ini
@@ -41,10 +46,8 @@ struct SoilRuleFlags {
 //   Rule #3 Flatline    : 20 poin
 //   Rule #4 No response : 20 poin
 //
-// Jika health <= SOIL_HEALTH_SWITCH_THRESHOLD (50)
-// -> auto-switch ke TIMER mode (tersimpan ke NVS).
-// Kembali ke HUMIDITY hanya via resetToHumidityMode()
-// (dipanggil dari perintah MQTT eksplisit).
+// Mode irigasi dipaksa dari IRRIGATION_MODE_SOURCE di SystemConfig.h:
+// 0 = HUMIDITY/ESP-NOW, 1 = TIMER. Health score tetap tersedia untuk telemetry.
 // =========================================
 class SoilHealthMonitor {
 public:

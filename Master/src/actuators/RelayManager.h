@@ -16,12 +16,15 @@ enum RelayChannel {
 
 class RelayManager {
 public:
+    RelayManager();
 
     void begin();
 
     void on(RelayChannel relay);
 
     void off(RelayChannel relay);
+
+    void toggle(RelayChannel relay);
 
     bool isOn(RelayChannel relay) const;
 
@@ -31,7 +34,9 @@ public:
 
 private:
 
-    uint8_t getPin(RelayChannel relay);
+    uint8_t getPin(RelayChannel relay) const;
+
+    bool relayState[9];
 };
 
 #endif

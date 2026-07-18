@@ -61,6 +61,8 @@ private:
     // --- Actuator helpers ---
     void startMixer();
     void stopMixer();
+    void startIrrigationOutput();
+    void stopIrrigationOutput();
 
     void openWaterInlet();
     void closeWaterInlet();

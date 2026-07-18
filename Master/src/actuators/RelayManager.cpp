@@ -7,7 +7,7 @@ static uint8_t relayOnLevel(RelayChannel relay) {
         case RELAY_PUMP_B:
         case RELAY_WATER_INLET:
         case RELAY_PUMP_MIX:
-        return LOW;
+            return LOW;
         
         case RELAY_MIXER_STIR:
         case RELAY_SOLENOID_A:
@@ -23,10 +23,37 @@ static uint8_t relayOffLevel(RelayChannel relay) {
     return relayOnLevel(relay) == HIGH ? LOW : HIGH;
 }
 
+static bool usesInputOffWorkaround(RelayChannel relay) {
+    switch (relay) {
+        case RELAY_WATER_INLET:
+            return true;
+
+        case RELAY_PUMP_A:
+        case RELAY_PUMP_B:
+        case RELAY_PUMP_MIX:
+        case RELAY_MIXER_STIR:
+        case RELAY_SOLENOID_A:
+        case RELAY_SOLENOID_B:
+        case RELAY_SOLENOID_IRRIG:
+            return false;
+    }
+
+    return false;
+}
+
 static void configureRelayPin(uint8_t pin, RelayChannel relay) {
+    if (usesInputOffWorkaround(relay)) {
+        // Hardware workaround: defective relay board stays ON when driven HIGH.
+        pinMode(pin, INPUT_PULLUP);
+        return;
+    }
+
     digitalWrite(pin, relayOffLevel(relay));
     pinMode(pin, OUTPUT);
     digitalWrite(pin, relayOffLevel(relay));
+}
+
+RelayManager::RelayManager() : relayState{} {
 }
 
 void RelayManager::begin() {
@@ -42,7 +69,7 @@ void RelayManager::begin() {
     allOff();
 }
 
-uint8_t RelayManager::getPin(RelayChannel relay) {
+uint8_t RelayManager::getPin(RelayChannel relay) const {
     switch(relay) {
         case RELAY_MIXER_STIR:          
             return RELAY_1_PIN;
@@ -66,26 +93,54 @@ uint8_t RelayManager::getPin(RelayChannel relay) {
 }
 
 void RelayManager::on(RelayChannel relay) {
-    digitalWrite(getPin(relay), relayOnLevel(relay));
+    if (!isValidRelayIndex(relay)) {
+        return;
+    }
+
+    uint8_t pin = getPin(relay);
+    digitalWrite(pin, relayOnLevel(relay));
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, relayOnLevel(relay));
+    relayState[relay] = true;
 }
 
 void RelayManager::off(RelayChannel relay) {
-    digitalWrite(getPin(relay), relayOffLevel(relay));
+    if (!isValidRelayIndex(relay)) {
+        return;
+    }
+
+    uint8_t pin = getPin(relay);
+
+    if (usesInputOffWorkaround(relay)) {
+        // Hardware workaround: defective active-LOW relays turn OFF only when GPIO is high impedance.
+        pinMode(pin, INPUT_PULLUP);
+    } else {
+        digitalWrite(pin, relayOffLevel(relay));
+        pinMode(pin, OUTPUT);
+        digitalWrite(pin, relayOffLevel(relay));
+    }
+
+    relayState[relay] = false;
+}
+
+void RelayManager::toggle(RelayChannel relay) {
+    if (!isValidRelayIndex(relay)) {
+        return;
+    }
+
+    if (isOn(relay)) {
+        off(relay);
+    } else {
+        on(relay);
+    }
 }
 
 bool RelayManager::isOn(RelayChannel relay) const {
-    switch (relay) {
-        case RELAY_MIXER_STIR:    return digitalRead(RELAY_1_PIN) == relayOnLevel(relay);
-        case RELAY_SOLENOID_A:    return digitalRead(RELAY_2_PIN) == relayOnLevel(relay);
-        case RELAY_SOLENOID_B:    return digitalRead(RELAY_3_PIN) == relayOnLevel(relay);
-        case RELAY_SOLENOID_IRRIG: return digitalRead(RELAY_4_PIN) == relayOnLevel(relay);
-        case RELAY_WATER_INLET:   return digitalRead(RELAY_5_PIN) == relayOnLevel(relay);
-        case RELAY_PUMP_A:        return digitalRead(RELAY_6_PIN) == relayOnLevel(relay);
-        case RELAY_PUMP_B:        return digitalRead(RELAY_7_PIN) == relayOnLevel(relay);
-        case RELAY_PUMP_MIX:      return digitalRead(RELAY_8_PIN) == relayOnLevel(relay);
+    if (!isValidRelayIndex(relay)) {
+        return false;
     }
 
-    return false;
+    return relayState[relay];
 }
 
 bool RelayManager::isValidRelayIndex(uint8_t index) const {

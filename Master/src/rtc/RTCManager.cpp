@@ -7,6 +7,13 @@ void RTCManager::begin() {
     }
 
     _rtcOk = true;
+    _lostPower = rtc.lostPower();
+
+#if SYNC_RTC_FROM_BUILD_TIME
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    _syncedFromBuildTime = true;
+#endif
+
     _dt = rtc.now();
 }
 
@@ -14,8 +21,20 @@ bool RTCManager::isOk() const {
     return _rtcOk;
 }
 
+bool RTCManager::lostPower() const {
+    return _lostPower;
+}
+
+bool RTCManager::wasSyncedFromBuildTime() const {
+    return _syncedFromBuildTime;
+}
+
 void RTCManager::refresh() {
     if (!_rtcOk) return;
+
+#if ENABLE_FSM_SIMULATION_TEST
+    return;
+#endif
 
     _dt = rtc.now();
 }
@@ -58,3 +77,11 @@ void RTCManager::setDailyMixSchedule(uint8_t hour, uint8_t minute) {
     _dailyMixHour   = hour;
     _dailyMixMinute = minute;
 }
+
+#if ENABLE_FSM_SIMULATION_TEST
+void RTCManager::setTestDateTime(uint16_t year, uint8_t month, uint8_t day,
+                                 uint8_t hour, uint8_t minute) {
+    _dt = DateTime(year, month, day, hour, minute, 0);
+    _rtcOk = true;
+}
+#endif

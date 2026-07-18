@@ -9,15 +9,10 @@
 #define ULTRASONIC_TRIG     5
 #define ULTRASONIC_ECHO     6
 
-// FLOW METER 9, 10, 11
-
-// #define FLOW_WATER_PIN      9
 #define FLOW_A_PIN          10
 #define FLOW_B_PIN          11
-// #define FLOW_IRRIG_PIN      7
-#define FLOW_IRRIG_PIN      9   // Flow sensor irigasi — dipakai saat mode TIMER Fallback
+#define FLOW_IRRIG_PIN      9   
 
-// I2C (RTC PCF8563)
 #define I2C_SDA_PIN         14
 #define I2C_SCL_PIN         15
 

@@ -232,10 +232,22 @@ bool FertigationFSM::isStateTimeout(unsigned long timeout) {
 //! ACTUATOR HELPERS
 void FertigationFSM::startMixer() {
     relayManager.on(RELAY_PUMP_MIX);
+    relayManager.on(RELAY_MIXER_STIR);
 }
 
 void FertigationFSM::stopMixer() {
     relayManager.off(RELAY_PUMP_MIX);
+    relayManager.off(RELAY_MIXER_STIR);
+}
+
+void FertigationFSM::startIrrigationOutput() {
+    relayManager.on(RELAY_PUMP_MIX);
+    relayManager.on(RELAY_SOLENOID_IRRIG);
+}
+
+void FertigationFSM::stopIrrigationOutput() {
+    relayManager.off(RELAY_PUMP_MIX);
+    relayManager.off(RELAY_SOLENOID_IRRIG);
 }
 
 void FertigationFSM::openWaterInlet() {
@@ -997,17 +1009,13 @@ void FertigationFSM::handlePreIrrigationValidate() {
 
 void FertigationFSM::handleIrrigation() {
     if (!stateInitialized) {
-        // Nyalakan Pompa Mixing & Solenoid Irigasi
-        relayManager.on(RELAY_PUMP_MIX);
-        relayManager.on(RELAY_SOLENOID_IRRIG);
-        
+        startIrrigationOutput();
         stateInitialized = true;
         logStateAction("[FSM] Start Irrigation");
     }
 
     if (sensor.soilADC <= currentIrrigation.wetThreshold) {
-        relayManager.off(RELAY_PUMP_MIX);
-        relayManager.off(RELAY_SOLENOID_IRRIG);
+        stopIrrigationOutput();
         _irrigJustCompleted = true; // Set flag for SoilHealthMonitor
         gotoReady();
     }
@@ -1043,9 +1051,7 @@ void FertigationFSM::handleTimerIrrigation() {
             // Reset flow meter irigasi
             irrigFlow.reset();
 
-            // Jalankan solenoid + pompa irigasi
-            relayManager.on(RELAY_PUMP_MIX);
-            relayManager.on(RELAY_SOLENOID_IRRIG);
+            startIrrigationOutput();
 
             _timerSlotRunning = true;
             _activeSlotIdx = triggeredSlot;
@@ -1057,9 +1063,7 @@ void FertigationFSM::handleTimerIrrigation() {
         float targetLiters = _timerTargetML / 1000.0f;
 
         if (currentVolLiters >= targetLiters) {
-            // Tutup solenoid + matikan pompa
-            relayManager.off(RELAY_PUMP_MIX);
-            relayManager.off(RELAY_SOLENOID_IRRIG);
+            stopIrrigationOutput();
 
             _timerSlotRunning = false;
             _activeSlotIdx = -1;

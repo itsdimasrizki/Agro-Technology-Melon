@@ -7,6 +7,7 @@
 #include "sensors/WaterLevel.h"
 #include "../communication/ESPNowManager.h"
 #include "sensors/FlowMeter.h"
+#include "TestFlags.h"
 
 struct SensorData {
     float temperature;
@@ -39,6 +40,10 @@ public:
     void update();
 
     SensorData getData() const;
+
+#if ENABLE_FSM_SIMULATION_TEST
+    void setTestData(const SensorData& testData);
+#endif
 
 private:
     SensorData data;

@@ -13,6 +13,8 @@ public:
     void refresh();
 
     bool isOk() const;
+    bool lostPower() const;
+    bool wasSyncedFromBuildTime() const;
 
     DateTime now();
 
@@ -50,6 +52,8 @@ private:
     DateTime _dt;
 
     bool _rtcOk = false;
+    bool _lostPower = false;
+    bool _syncedFromBuildTime = false;
 };
 
 #endif

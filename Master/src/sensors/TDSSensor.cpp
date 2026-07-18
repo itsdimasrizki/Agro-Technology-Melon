@@ -1,7 +1,7 @@
 #include "TDSSensor.h"
 
 namespace {
-constexpr float FALLBACK_TEMP_C = 25.0f;
+constexpr float FALLBACK_TEMP_C = 27.6f;
 constexpr float MIN_VALID_TEMP_C = -10.0f;
 constexpr float MAX_VALID_TEMP_C = 80.0f;
 }

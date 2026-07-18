@@ -7,11 +7,26 @@ void RTCManager::begin() {
     }
 
     _rtcOk = true;
+    _lostPower = rtc.lostPower();
+
+#if SYNC_RTC_FROM_BUILD_TIME
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    _syncedFromBuildTime = true;
+#endif
+
     _dt = rtc.now();
 }
 
 bool RTCManager::isOk() const {
     return _rtcOk;
+}
+
+bool RTCManager::lostPower() const {
+    return _lostPower;
+}
+
+bool RTCManager::wasSyncedFromBuildTime() const {
+    return _syncedFromBuildTime;
 }
 
 void RTCManager::refresh() {

@@ -5,6 +5,11 @@
 #define ENABLE_FULL_SYSTEM_TEST           0
 #define ENABLE_MQTT_CONFIGURATION_TEST    0
 
+// Set PCF8563 RTC to firmware build time on boot.
+// Keep this 1 while calibrating/testing RTC from a WIB build machine.
+// Set to 0 after RTC time is correct and the backup battery is installed.
+#define SYNC_RTC_FROM_BUILD_TIME          0
+
 #define TEST_MODE_COUNT \
     (ENABLE_FSM_SIMULATION_TEST + \
      ENABLE_RELAY_HARDWARE_TEST + \

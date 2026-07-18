@@ -240,6 +240,26 @@ void logBootStep(const char* component, const char* status) {
     logLine("INFO", component, message);
 }
 
+void logRTCStatus() {
+    DateTime now = rtcManager.now();
+    char message[128];
+    snprintf(
+        message,
+        sizeof(message),
+        "time=%04u-%02u-%02u %02u:%02u:%02u plant_age=%u sync=%s lost_power=%s",
+        now.year(),
+        now.month(),
+        now.day(),
+        now.hour(),
+        now.minute(),
+        now.second(),
+        rtcManager.getPlantAgeDays(),
+        rtcManager.wasSyncedFromBuildTime() ? "BUILD_TIME" : "RTC",
+        rtcManager.lostPower() ? "YES" : "NO"
+    );
+    logLine("INFO", "RTC", message);
+}
+
 void appendRelay(char* buffer, size_t size, bool& first, uint8_t relayIndex) {
     size_t used = strlen(buffer);
     snprintf(
@@ -293,6 +313,20 @@ void logSystemStatus(const SensorData& data) {
         now,
         stateToString(fsm.getState()),
         errorToString(fsm.getError())
+    );
+    DateTime rtcNow = rtcManager.now();
+    Serial.printf(
+        "t=%010lu | INFO  | RTC      | time=%04u-%02u-%02u %02u:%02u:%02u plant_age=%u sync=%s lost_power=%s\n",
+        now,
+        rtcNow.year(),
+        rtcNow.month(),
+        rtcNow.day(),
+        rtcNow.hour(),
+        rtcNow.minute(),
+        rtcNow.second(),
+        rtcManager.getPlantAgeDays(),
+        rtcManager.wasSyncedFromBuildTime() ? "BUILD_TIME" : "RTC",
+        rtcManager.lostPower() ? "YES" : "NO"
     );
     Serial.printf(
         "t=%010lu | INFO  | NETWORK  | wifi=%s mqtt=%s ip=%s\n",
@@ -409,6 +443,9 @@ void setup() {
     rtcManager.setPlantingDate(configManager.getPlantYear(), configManager.getPlantMonth(), configManager.getPlantDay());
     rtcManager.setDailyMixSchedule(configManager.getDailyMixHour(), configManager.getDailyMixMinute());
     logBootStep("RTC", rtcManager.isOk() ? "ready" : "error");
+    if (rtcManager.isOk()) {
+        logRTCStatus();
+    }
 
     recovery.begin();
     logBootStep("RECOVERY", "ready");
@@ -428,6 +465,7 @@ void setup() {
     rtcManager.setPlantingDate(configManager.getPlantYear(), configManager.getPlantMonth(), configManager.getPlantDay());
     rtcManager.setDailyMixSchedule(configManager.getDailyMixHour(), configManager.getDailyMixMinute());
     rtcManager.setTestDateTime(2026, 7, 17, configManager.getDailyMixHour(), configManager.getDailyMixMinute());
+    logRTCStatus();
     recovery.begin();
     logBootStep("RECOVERY", "ready");
     logBootStep("RTC", "test_ready");

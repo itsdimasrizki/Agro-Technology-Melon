@@ -26,11 +26,11 @@ static uint8_t relayOffLevel(RelayChannel relay) {
 static bool usesInputOffWorkaround(RelayChannel relay) {
     switch (relay) {
         case RELAY_WATER_INLET:
+            return true;
+
         case RELAY_PUMP_A:
         case RELAY_PUMP_B:
         case RELAY_PUMP_MIX:
-            return true;
-
         case RELAY_MIXER_STIR:
         case RELAY_SOLENOID_A:
         case RELAY_SOLENOID_B:

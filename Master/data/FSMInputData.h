@@ -37,7 +37,7 @@ static const char FSM_INPUT_PAYLOAD_SCHEDULE[] = R"json(
   "plant_year": 2026,
   "plant_month": 7,
   "plant_day": 5,
-  "daily_mix_hour": 5,
+  "daily_mix_hour": 3,
   "daily_mix_minute": 0
 }
 )json";

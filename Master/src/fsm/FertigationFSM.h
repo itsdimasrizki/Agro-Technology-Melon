@@ -87,8 +87,9 @@ private:
     // --- Recipe ---
     void prepareDailyRecipe();
 
-    // Refresh currentIrrigation threshold + minimum-liter check + trigger stir pagi.
-    // Dipanggil sekali per hari dari handleWaitDailyMix().
+    // Refresh currentIrrigation threshold + minimum-liter check.
+    // Stir pagi TIDAK dipicu di sini — RELAY_MIXER_STIR tidak boleh nyala
+    // selama WAIT_DAILY_MIX. Dipanggil sekali per hari dari handleWaitDailyMix().
     void refreshDailyChecks();
 
     // Hitung minimum-liter dinamis dan blokir irigasi jika tidak cukup.
@@ -233,7 +234,6 @@ private:
     // --- Stirring & Daily-check state ---
     // Hari terakhir refreshDailyChecks() dijalankan (cegah re-run pada tick yang sama)
     uint16_t      _lastDailyCheckDay  = 0xFFFF;
-    bool          _morningStirDone    = false;   // stir pagi sudah dijalankan hari ini
     bool          _eveningStirDone    = false;   // stir sore sudah dijalankan hari ini
     bool          _stirring           = false;   // apakah stirrer sedang aktif
     unsigned long _stirStartMs        = 0;       // kapan stirrer dinyalakan

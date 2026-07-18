@@ -352,20 +352,13 @@ void FertigationFSM::refreshDailyChecks() {
     // 1. Refresh threshold irigasi harian (independen dari siklus mixing)
     currentIrrigation = irrigationRecipe.getRecipe(age);
 
-    // 2. Reset flag stir harian
-    _morningStirDone = false;
+    // 2. Reset flag stir harian (hanya stir sore; stir pagi dihapus)
     _eveningStirDone = false;
 
-    // 3. Cek minimum-liter dan trigger stir pagi jika lolos
-    if (checkMinimumWater()) {
-        if (!_morningStirDone && state == FertigationState::WAIT_DAILY_MIX) {
-            startFillStirrer();
-            _stirring        = true;
-            _stirStartMs     = millis();
-            _morningStirDone = true;
-            logStateAction("[FSM] Stir pagi dimulai");
-        }
-    }
+    // 3. Cek minimum-liter — update status warning tangki harian.
+    //    Stir pagi sengaja TIDAK dipicu di sini: RELAY_MIXER_STIR tidak boleh
+    //    nyala selama state WAIT_DAILY_MIX (risiko overheat solenoid).
+    checkMinimumWater();
 }
 
 // =========================================
@@ -977,7 +970,7 @@ void FertigationFSM::handleReady() {
     soilHealthMonitor.update(sensor.soilADC, _irrigJustCompleted, currentIrrigation.wetThreshold);
     _irrigJustCompleted = false;
 
-    // Jalankan stir schedule (pagi sudah dipicu oleh refreshDailyChecks, ini untuk sore + stop timer)
+    // Jalankan stir schedule (stir sore sesuai jam config + stop timer jika durasi habis)
     handleStirSchedule();
 
     // Cek minimum-liter dinamis — blokir irigasi jika tangki tidak cukup.

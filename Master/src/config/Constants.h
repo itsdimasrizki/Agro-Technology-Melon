@@ -8,9 +8,9 @@ constexpr float CORRECTION_DOSE = 0.05f; // 50mL
 
 // Durasi mixing produksi.
 constexpr uint32_t PRE_MIX_TANK_TIME       = 60000UL;   // 1 menit
-constexpr uint32_t PRE_MIX_CORRECTION_TIME = 60000UL;   // 1 menit
-constexpr uint32_t MIX_A_TIME              = 300000UL;  // 5 menit
-constexpr uint32_t MIX_B_TIME              = 300000UL;  // 5 menit
+constexpr uint32_t PRE_MIX_CORRECTION_TIME = 300000UL;   // 5 menit
+constexpr uint32_t MIX_A_TIME              = 900000UL;  // 15 menit
+constexpr uint32_t MIX_B_TIME              = 900000UL;  // 15 menit
 
 constexpr unsigned long WATER_FILL_TIMEOUT  = 1800000UL; // 30 menit
 constexpr unsigned long NUTRIENT_TIMEOUT    = 300000UL;  // 5 menit

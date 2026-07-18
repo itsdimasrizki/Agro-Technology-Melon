@@ -17,6 +17,11 @@ public:
     // Mengembalikan 0 jika belum pernah terima paket sejak boot.
     unsigned long getLastReceiveTime() const;
 
+    bool hasReceivedData() const;
+    uint32_t getPacketCount() const;
+    int getLastPacketSize() const;
+    void getLastSenderMac(char* buffer, size_t size) const;
+
     SoilData getData() const;
 
     void clearFlag();
@@ -30,8 +35,11 @@ private:
 
     static SoilData receivedData;
 
-    static volatile bool        newData;
+    static volatile bool          newData;
     static volatile unsigned long _lastReceiveMs;
+    static volatile uint32_t      _packetCount;
+    static volatile int           _lastPacketSize;
+    static uint8_t                _lastSenderMac[6];
 };
 
 #endif

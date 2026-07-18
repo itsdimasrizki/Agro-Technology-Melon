@@ -6,9 +6,8 @@
 
 #include "../communication/SoilData.h"
 
-static const uint8_t MASTER_MAC[6] = {
-    0xAC, 0xA7, 0x04, 0x13, 0x6E, 0x8C   // <Konfigurasi : Ubah dengan MAC Address asli dari ESP32 Master>
-// AC:A7:04:13:6E:8C
+static const uint8_t ESPNOW_TARGET_MAC[6] = {
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF   // Broadcast: Master menerima paket dari sender mana pun di channel yang sama.
 };
 
 class ESPNowSender {
@@ -16,6 +15,8 @@ public:
     bool begin();
 
     bool send(const SoilData& data);
+    bool wasLastSendDelivered() const;
+    void getTargetMac(char* buffer, size_t size) const;
 
 private:
     static void onSendCallback(

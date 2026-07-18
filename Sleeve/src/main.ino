@@ -28,16 +28,17 @@ void logLine(const char* level, const char* component, const char* message) {
     );
 }
 
-void logSoilStatus(const SoilData& data, bool sendOk) {
+void logSoilStatus(const SoilData& data, bool queueOk, bool deliveryOk) {
     Serial.printf(
-        "t=%010lu | INFO  | SOIL     | s1=%u s2=%u s3=%u s4=%u avg=%u espnow=%s\n",
+        "t=%010lu | INFO  | SOIL     | s1=%u s2=%u s3=%u s4=%u avg=%u espnow_queue=%s espnow_delivery=%s\n",
         millis(),
         data.sensor1,
         data.sensor2,
         data.sensor3,
         data.sensor4,
         data.averageRawADC,
-        sendOk ? "OK" : "FAIL"
+        queueOk ? "OK" : "FAIL",
+        deliveryOk ? "OK" : "FAIL"
     );
 }
 
@@ -53,6 +54,14 @@ void setup() {
     }
 
     logLine("INFO", "ESPNOW", "init=ready");
+    char targetMac[18];
+    espNow.getTargetMac(targetMac, sizeof(targetMac));
+    Serial.printf(
+        "t=%010lu | INFO  | ESPNOW   | sleeve_mac=%s target_master=%s\n",
+        millis(),
+        WiFi.macAddress().c_str(),
+        targetMac
+    );
     logLine("INFO", "BOOT", "system=ready");
 }
 
@@ -71,6 +80,6 @@ void loop() {
 
     if (now - lastStatusLog >= STATUS_LOG_INTERVAL_MS) {
         lastStatusLog = now;
-        logSoilStatus(soilSensor.getData(), lastSendOk);
+        logSoilStatus(soilSensor.getData(), lastSendOk, espNow.wasLastSendDelivered());
     }
 }

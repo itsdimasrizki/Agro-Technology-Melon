@@ -19,7 +19,7 @@ static const char FSM_INPUT_PAYLOAD_SYSTEM[] = R"json(
 {
   "total_plants": 80,
   "max_consumption_per_plant": 2.0,
-  "target_fill_volume": 630.0,
+  "target_fill_volume": 640.0,
   "tank_capacity_liter": 700.0,
   "tank_height_cm": 142.0,
   "tank_diameter_cm": 83.0
@@ -37,7 +37,7 @@ static const char FSM_INPUT_PAYLOAD_SCHEDULE[] = R"json(
   "plant_year": 2026,
   "plant_month": 7,
   "plant_day": 5,
-  "daily_mix_hour": 3,
+  "daily_mix_hour": 4,
   "daily_mix_minute": 0
 }
 )json";
@@ -48,8 +48,8 @@ static const char FSM_INPUT_PAYLOAD_SCHEDULE[] = R"json(
 static const char FSM_INPUT_PAYLOAD_PPM[] = R"json(
 {
   "ppm_tolerance": 50.0,
-  "initial_a": 1.5,
-  "initial_b": 1.5
+  "initial_a": 1.0,
+  "initial_b": 1.0
 }
 )json";
 // Not covered by the PDF (no starting pump-ratio data), left as-is.
@@ -57,7 +57,7 @@ static const char FSM_INPUT_PAYLOAD_PPM[] = R"json(
 static const char FSM_INPUT_PAYLOAD_PH[] = R"json(
 {
   "min_ph": 5.9,
-  "max_ph": 6.5
+  "max_ph": 8.0
 }
 )json";
 // Every row in the PDF lists "5.9-6.5" for pH (was 5.5-6.5 before), corrected.

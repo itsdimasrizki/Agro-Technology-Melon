@@ -4,6 +4,11 @@ namespace {
 constexpr float FALLBACK_TEMP_C = 27.6f;
 constexpr float MIN_VALID_TEMP_C = -10.0f;
 constexpr float MAX_VALID_TEMP_C = 80.0f;
+
+// Kalibrasi TDS DFRobot secara software.
+// Rumus: (Nilai Asli dari TDS Meter Manual) / (Nilai Bacaan ESP32)
+// Contoh: 900.0 / 2145.0 = 0.4195
+constexpr float TDS_K_VALUE = 0.4195f;
 }
 
 TDSSensor::TDSSensor(uint8_t pin) {
@@ -43,5 +48,5 @@ float TDSSensor::readPPM(float waterTemp) {
         +
         (857.39f * compensationVoltage);
 
-    return tdsValue * 0.5f;
+    return tdsValue * 0.5f * TDS_K_VALUE;
 }

@@ -16,55 +16,61 @@ static const char TIMER_IRRIGATION_PAYLOAD[] = R"json(
       "start_hour": 7,
       "start_minute": 0,
       "end_hour": 7,
-      "end_minute": 2
+      "end_minute": 3
     },
     {
       "start_hour": 8,
       "start_minute": 0,
       "end_hour": 8,
-      "end_minute": 2
+      "end_minute": 3
     },
     {
       "start_hour": 9,
       "start_minute": 0,
       "end_hour": 9,
-      "end_minute": 2
+      "end_minute": 3
     },
     {
       "start_hour": 10,
       "start_minute": 0,
       "end_hour": 10,
-      "end_minute": 2
+      "end_minute": 3
     },
     {
       "start_hour": 11,
       "start_minute": 0,
       "end_hour": 11,
-      "end_minute": 2
+      "end_minute": 3
+    },
+    {
+      "start_hour": 12,
+      "start_minute": 0,
+      "end_hour": 12,
+      "end_minute": 3
     },
     {
       "start_hour": 13,
       "start_minute": 0,
       "end_hour": 13,
-      "end_minute": 2
+      "end_minute": 3
     },
     {
       "start_hour": 14,
       "start_minute": 0,
       "end_hour": 14,
-      "end_minute": 2
+      "end_minute": 3
     },
     {
       "start_hour": 15,
       "start_minute": 0,
       "end_hour": 15,
-      "end_minute": 2
+      "end_minute": 3
     },
     {
       "start_hour": 16,
       "start_minute": 0,
       "end_hour": 16,
-      "end_minute": 2
+      "end_minute": 3
     }
   ]
 }

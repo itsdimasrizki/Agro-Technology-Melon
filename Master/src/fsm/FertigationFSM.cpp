@@ -973,6 +973,29 @@ void FertigationFSM::handleReady() {
     // Jalankan stir schedule (stir sore sesuai jam config + stop timer jika durasi habis)
     handleStirSchedule();
 
+    // Cek jadwal daily mix — jika jam mixing tiba di hari baru, mulai siklus mixing harian.
+    // Guard per hari (day != lastMixDay) agar tidak retrigger dalam menit yang sama.
+    {
+        uint8_t  hour   = rtcManager.getHour();
+        uint8_t  minute = rtcManager.getMinute();
+        uint16_t day    = rtcManager.getPlantAgeDays();
+        uint8_t  month  = rtcManager.getMonth();
+        uint16_t year   = rtcManager.getYear();
+
+        if (hour == rtcManager.getDailyMixHour() && minute == rtcManager.getDailyMixMinute()
+            && day != lastMixDay) {
+            lastMixDay   = day;
+            lastMixMonth = month;
+            lastMixYear  = year;
+            logStateAction("[FSM] READY → Daily mix schedule triggered — mulai siklus mixing harian");
+            changeState(FertigationState::PREPARE_DAILY_MIX);
+            return;
+        }
+    }
+
+    // Refresh daily checks (threshold irigasi + minimum-liter) — guard internal 1x/hari
+    refreshDailyChecks();
+
     // Cek minimum-liter dinamis — blokir irigasi jika tangki tidak cukup.
     // Stir schedule tetap jalan meski irigasi diblokir.
     if (!checkMinimumWater()) {

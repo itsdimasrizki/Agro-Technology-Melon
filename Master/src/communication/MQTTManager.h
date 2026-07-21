@@ -62,7 +62,7 @@
 
 // Jika 0, firmware tidak akan membuka captive portal/blocking WiFi saat boot.
 // FSM tetap jalan offline; MQTT publish dicoba hanya saat WiFi sudah terhubung.
-#define WIFI_BLOCKING_PORTAL_ENABLED 0
+#define WIFI_BLOCKING_PORTAL_ENABLED 1
 
 class MQTTManager {
 public:

@@ -171,6 +171,28 @@ void runRelayHardwareTest() {
 }
 #endif
 
+#if ENABLE_NUTRIENT_WIRING_TEST
+void runNutrientWiringTest() {
+    static unsigned long lastLog = 0;
+
+    unsigned long now = millis();
+    if (now - lastLog < 1000UL) {
+        return;
+    }
+    lastLog = now;
+
+    // Serial log volume ketiga flow meter setiap 1 detik
+    // Bandingkan dengan isi gelas takar untuk kalibrasi PULSES_PER_LITER
+    Serial.printf(
+        "t=%010lu | INFO  | WIRING   | flowA=%.4fL flowB=%.4fL flowIrrig=%.4fL\n",
+        now,
+        flowA.getVolumeLiter(),
+        flowB.getVolumeLiter(),
+        flowIrrig.getVolumeLiter()
+    );
+}
+#endif
+
 const char* stateToString(FertigationState state) {
     switch (state) {
         case FertigationState::IDLE:                    return "IDLE";
@@ -441,6 +463,35 @@ void setup() {
     return;
 #endif
 
+#if ENABLE_NUTRIENT_WIRING_TEST
+    flowA.begin(flowAISR);
+    flowB.begin(flowBISR);
+    flowIrrig.begin(flowIrrigISR);
+    logBootStep("FLOW", "ready (wiring test)");
+
+#if !TEST_NUTRIENT_A && !TEST_NUTRIENT_B && !TEST_IRRIGATION
+    logLine("WARN", "TEST", "mode=nutrient_wiring SEMUA flag TEST_* = 0 — tidak ada relay yang menyala!");
+#endif
+
+#if TEST_NUTRIENT_A
+    relay.on(RELAY_PUMP_A);
+    relay.on(RELAY_SOLENOID_A);
+    logLine("INFO", "TEST", "mode=nutrient_wiring RELAY_PUMP_A+RELAY_SOLENOID_A=ON");
+#endif
+#if TEST_NUTRIENT_B
+    relay.on(RELAY_PUMP_B);
+    relay.on(RELAY_SOLENOID_B);
+    logLine("INFO", "TEST", "mode=nutrient_wiring RELAY_PUMP_B+RELAY_SOLENOID_B=ON");
+#endif
+#if TEST_IRRIGATION
+    relay.on(RELAY_PUMP_MIX);
+    relay.on(RELAY_SOLENOID_IRRIG);
+    logLine("INFO", "TEST", "mode=nutrient_wiring RELAY_PUMP_MIX+RELAY_SOLENOID_IRRIG=ON");
+#endif
+
+    logLine("INFO", "TEST", "mode=nutrient_wiring ready — baca log flowA/B/Irrig tiap 1 detik");
+    return;
+#endif
 #if !ENABLE_FSM_SIMULATION_TEST
     flowA.begin(flowAISR);
     flowB.begin(flowBISR);
@@ -519,6 +570,11 @@ void setup() {
 void loop() {
 #if ENABLE_RELAY_HARDWARE_TEST
     runRelayHardwareTest();
+    return;
+#endif
+
+#if ENABLE_NUTRIENT_WIRING_TEST
+    runNutrientWiringTest();
     return;
 #endif
 

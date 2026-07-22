@@ -5,6 +5,15 @@
 #define ENABLE_FULL_SYSTEM_TEST           0
 #define ENABLE_MQTT_CONFIGURATION_TEST    0
 
+// ENABLE_NUTRIENT_WIRING_TEST
+// Mode kalibrasi lapangan: relay dosing ON terus-menerus (bukan pulsing).
+// Sub-flag di bawah (0/1) bisa dikombinasi bebas:
+#define ENABLE_NUTRIENT_WIRING_TEST       0
+
+#define TEST_NUTRIENT_A                   0   // 1 = aktifkan Pump A + Solenoid A
+#define TEST_NUTRIENT_B                   0   // 1 = aktifkan Pump B + Solenoid B
+#define TEST_IRRIGATION                   0   // 1 = aktifkan Pump Mix + Solenoid Irrig
+
 // Set PCF8563 RTC to firmware build time on boot.
 // Keep this 1 while calibrating/testing RTC from a WIB build machine.
 // Set to 0 after RTC time is correct and the backup battery is installed.
@@ -14,7 +23,8 @@
     (ENABLE_FSM_SIMULATION_TEST + \
      ENABLE_RELAY_HARDWARE_TEST + \
      ENABLE_FULL_SYSTEM_TEST + \
-     ENABLE_MQTT_CONFIGURATION_TEST)
+     ENABLE_MQTT_CONFIGURATION_TEST + \
+     ENABLE_NUTRIENT_WIRING_TEST)
 
 #if TEST_MODE_COUNT > 1
 #error "Only one test mode may be enabled at a time."

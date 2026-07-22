@@ -3,6 +3,20 @@
 
 #include <stdint.h>
 
+// KALIBRASI FLOW METER
+// Nilai default 450.0 adalah spesifikasi datasheet generic.
+// Setelah field test (ENABLE_NUTRIENT_WIRING_TEST), isi dengan:
+//   PULSES_PER_LITER = total_pulses / volume_gelas_takar_liter
+constexpr float PULSES_PER_LITER = 450.0f;
+
+// DRAIN DELAY — selang draining setelah pompa dimatikan
+constexpr uint32_t NUTRIENT_DRAIN_DELAY_MS = 3000UL; 
+
+// MODE DOSING NUTRISI AWAL (ADD_NUTRIENT_A / ADD_NUTRIENT_B)
+// 1 = continuous flow (pompa+solenoid ON terus sampai target tercapai) — DEFAULT
+// 0 = pulsing 1s ON / 1s OFF (mode lama, tersedia sebagai fallback)
+#define NUTRIENT_DOSING_CONTINUOUS 1
+
 // Dosis per injeksi koreksi PPM nutrisi A/B.
 constexpr float CORRECTION_DOSE = 0.05f; // 50mL
 

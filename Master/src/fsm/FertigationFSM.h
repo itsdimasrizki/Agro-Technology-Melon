@@ -221,6 +221,13 @@ private:
     unsigned long lastPulseTime = 0;
     bool pulseOpenState = false;
 
+    // Drain-delay state: Pump OFF → tunggu NUTRIENT_DRAIN_DELAY_MS → Solenoid OFF.
+    // Pisah per channel agar A dan B bisa drain secara independen.
+    bool          _drainActiveA  = false;  // sedang dalam window drain setelah pump A off
+    bool          _drainActiveB  = false;  // sedang dalam window drain setelah pump B off
+    unsigned long _drainStartMsA = 0;      // millis() saat pump A dimatikan
+    unsigned long _drainStartMsB = 0;      // millis() saat pump B dimatikan
+
     // Menyimpan state mana yang memulai koreksi PPM
     // (VALIDATE atau PRE_IRRIGATION_VALIDATE)
     // Digunakan oleh gotoPostCorrection() untuk kembali ke validate yang benar

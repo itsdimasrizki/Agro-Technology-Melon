@@ -716,16 +716,24 @@ void FertigationFSM::handleAddNutrientA() {
         if (!wasRecovering) {
             nutrientAFlow.reset();
         }
-        lastPulseTime = millis();
-        pulseOpenState = true;
+        _drainActiveA  = false;
+        _drainStartMsA = 0;
         nutrientAFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_A);
         relayManager.on(RELAY_SOLENOID_A);
+#ifdef NUTRIENT_DOSING_CONTINUOUS
+        stateInitialized = true;
+        logStateAction("[FSM] Dosing Nutrient A (Continuous)");
+#else
+        lastPulseTime  = millis();
+        pulseOpenState = true;
         stateInitialized = true;
         logStateAction("[FSM] Dosing Nutrient A (Pulsed)");
+#endif
     }
 
-    // Solenoid A / Pompa A pulsing (buka 1s, tutup 1s)
+#ifndef NUTRIENT_DOSING_CONTINUOUS
+    // Solenoid A / Pompa A pulsing (buka 1s, tutup 1s) — mode fallback
     if (millis() - lastPulseTime >= 1000) {
         pulseOpenState = !pulseOpenState;
         lastPulseTime = millis();
@@ -739,12 +747,24 @@ void FertigationFSM::handleAddNutrientA() {
             logStateAction("[FSM] Nutrient A Solenoid CLOSED");
         }
     }
+#endif
 
     if (sensor.flowA >= targetNutrientA) {
-        nutrientAFlow.setCountingEnabled(false);
-        relayManager.off(RELAY_PUMP_A);
-        relayManager.off(RELAY_SOLENOID_A);
-        changeState(FertigationState::MIX_A);
+        // ── Tahap 1: matikan Pump, aktifkan drain timer ──
+        if (!_drainActiveA) {
+            nutrientAFlow.setCountingEnabled(false);
+            relayManager.off(RELAY_PUMP_A);   // pump off dahulu
+            _drainActiveA  = true;
+            _drainStartMsA = millis();
+            logStateAction("[FSM] Nutrient A Pump OFF — menunggu drain");
+            return;
+        }
+        // ── Tahap 2: setelah NUTRIENT_DRAIN_DELAY_MS, tutup Solenoid ──
+        if (millis() - _drainStartMsA >= NUTRIENT_DRAIN_DELAY_MS) {
+            relayManager.off(RELAY_SOLENOID_A);  // solenoid off setelah cairan turun
+            logStateAction("[FSM] Nutrient A Solenoid OFF — drain selesai, lanjut MIX_A");
+            changeState(FertigationState::MIX_A);
+        }
     }
 }
 
@@ -786,16 +806,24 @@ void FertigationFSM::handleAddNutrientB() {
         if (!wasRecovering) {
             nutrientBFlow.reset();
         }
-        lastPulseTime = millis();
-        pulseOpenState = true;
+        _drainActiveB  = false;
+        _drainStartMsB = 0;
         nutrientBFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_B);
         relayManager.on(RELAY_SOLENOID_B);
+#ifdef NUTRIENT_DOSING_CONTINUOUS
+        stateInitialized = true;
+        logStateAction("[FSM] Dosing Nutrient B (Continuous)");
+#else
+        lastPulseTime  = millis();
+        pulseOpenState = true;
         stateInitialized = true;
         logStateAction("[FSM] Dosing Nutrient B (Pulsed)");
+#endif
     }
 
-    // Solenoid B / Pompa B pulsing (buka 1s, tutup 1s)
+#ifndef NUTRIENT_DOSING_CONTINUOUS
+    // Solenoid B / Pompa B pulsing (buka 1s, tutup 1s) — mode fallback
     if (millis() - lastPulseTime >= 1000) {
         pulseOpenState = !pulseOpenState;
         lastPulseTime = millis();
@@ -809,12 +837,24 @@ void FertigationFSM::handleAddNutrientB() {
             logStateAction("[FSM] Nutrient B Solenoid CLOSED");
         }
     }
+#endif
 
     if (sensor.flowB >= targetNutrientB) {
-        nutrientBFlow.setCountingEnabled(false);
-        relayManager.off(RELAY_PUMP_B);
-        relayManager.off(RELAY_SOLENOID_B);
-        changeState(FertigationState::MIX_B);
+        // ── Tahap 1: matikan Pump, aktifkan drain timer ──
+        if (!_drainActiveB) {
+            nutrientBFlow.setCountingEnabled(false);
+            relayManager.off(RELAY_PUMP_B);   // pump off dahulu
+            _drainActiveB  = true;
+            _drainStartMsB = millis();
+            logStateAction("[FSM] Nutrient B Pump OFF — menunggu drain");
+            return;
+        }
+        // ── Tahap 2: setelah NUTRIENT_DRAIN_DELAY_MS, tutup Solenoid ──
+        if (millis() - _drainStartMsB >= NUTRIENT_DRAIN_DELAY_MS) {
+            relayManager.off(RELAY_SOLENOID_B);  // solenoid off setelah cairan turun
+            logStateAction("[FSM] Nutrient B Solenoid OFF — drain selesai, lanjut MIX_B");
+            changeState(FertigationState::MIX_B);
+        }
     }
 }
 
@@ -888,7 +928,13 @@ void FertigationFSM::handleCorrectPPM() {
             nutrientBFlow.reset();
         }
 
-        lastPulseTime = millis();
+        // Reset drain state tiap kali masuk siklus koreksi baru
+        _drainActiveA  = false;
+        _drainActiveB  = false;
+        _drainStartMsA = 0;
+        _drainStartMsB = 0;
+
+        lastPulseTime  = millis();
         pulseOpenState = true;
 
         if (sensor.flowA < CORRECTION_DOSE) {
@@ -903,51 +949,76 @@ void FertigationFSM::handleCorrectPPM() {
         }
 
         stateInitialized = true;
-        logStateAction("[FSM] Injeksi Dosis Koreksi PPM (Pulsed)");
+        logStateAction("[FSM] Injeksi Dosis Koreksi PPM (Continuous)");
     }
 
     // Pulsing solenoid Nutrisi A & B bersamaan (buka 1s, tutup 1s)
+    // Correction SELALU pakai pulsing — mode continuous tidak berlaku di sini
+    // karena dosis 50 mL sangat kecil dan perlu kontrol lebih teliti.
     if (millis() - lastPulseTime >= 1000) {
         pulseOpenState = !pulseOpenState;
         lastPulseTime = millis();
 
         if (pulseOpenState) {
-            if (sensor.flowA < CORRECTION_DOSE) {
+            if (sensor.flowA < CORRECTION_DOSE && !_drainActiveA) {
                 relayManager.on(RELAY_PUMP_A);
                 relayManager.on(RELAY_SOLENOID_A);
                 logStateAction("[FSM] Nutrient A Solenoid OPEN (Correction)");
             }
-            if (sensor.flowB < CORRECTION_DOSE) {
+            if (sensor.flowB < CORRECTION_DOSE && !_drainActiveB) {
                 relayManager.on(RELAY_PUMP_B);
                 relayManager.on(RELAY_SOLENOID_B);
                 logStateAction("[FSM] Nutrient B Solenoid OPEN (Correction)");
             }
         } else {
-            relayManager.off(RELAY_PUMP_A);
-            relayManager.off(RELAY_SOLENOID_A);
-            relayManager.off(RELAY_PUMP_B);
-            relayManager.off(RELAY_SOLENOID_B);
+            if (!_drainActiveA) {
+                relayManager.off(RELAY_PUMP_A);
+                relayManager.off(RELAY_SOLENOID_A);
+            }
+            if (!_drainActiveB) {
+                relayManager.off(RELAY_PUMP_B);
+                relayManager.off(RELAY_SOLENOID_B);
+            }
             logStateAction("[FSM] Nutrient A & B Solenoids CLOSED (Correction)");
         }
     }
 
-    // Matikan segera jika sudah melampaui target
-    if (sensor.flowA >= CORRECTION_DOSE) {
+    // ── Channel A: Pump OFF → drain delay → Solenoid OFF ──
+    if (sensor.flowA >= CORRECTION_DOSE && !_drainActiveA) {
         nutrientAFlow.setCountingEnabled(false);
-        relayManager.off(RELAY_PUMP_A);
-        relayManager.off(RELAY_SOLENOID_A);
+        relayManager.off(RELAY_PUMP_A);   // pump off dahulu
+        _drainActiveA  = true;
+        _drainStartMsA = millis();
+        logStateAction("[FSM] Correction A Pump OFF — menunggu drain");
     }
-    if (sensor.flowB >= CORRECTION_DOSE) {
-        nutrientBFlow.setCountingEnabled(false);
-        relayManager.off(RELAY_PUMP_B);
-        relayManager.off(RELAY_SOLENOID_B);
+    if (_drainActiveA && millis() - _drainStartMsA >= NUTRIENT_DRAIN_DELAY_MS) {
+        relayManager.off(RELAY_SOLENOID_A);
+        // flag tetap true — mencegah pump dinyalakan kembali oleh blok pulsing
     }
 
-    if (sensor.flowA >= CORRECTION_DOSE && sensor.flowB >= CORRECTION_DOSE) {
-        relayManager.off(RELAY_PUMP_A);
-        relayManager.off(RELAY_SOLENOID_A);
-        relayManager.off(RELAY_PUMP_B);
+    // ── Channel B: Pump OFF → drain delay → Solenoid OFF ──
+    if (sensor.flowB >= CORRECTION_DOSE && !_drainActiveB) {
+        nutrientBFlow.setCountingEnabled(false);
+        relayManager.off(RELAY_PUMP_B);   // pump off dahulu
+        _drainActiveB  = true;
+        _drainStartMsB = millis();
+        logStateAction("[FSM] Correction B Pump OFF — menunggu drain");
+    }
+    if (_drainActiveB && millis() - _drainStartMsB >= NUTRIENT_DRAIN_DELAY_MS) {
         relayManager.off(RELAY_SOLENOID_B);
+        // flag tetap true — mencegah pump dinyalakan kembali oleh blok pulsing
+    }
+
+    // ── Transisi ke CORRECTION_MIX: kedua channel sudah selesai drain ──
+    bool aDone = (sensor.flowA >= CORRECTION_DOSE) &&
+                 _drainActiveA &&
+                 (millis() - _drainStartMsA >= NUTRIENT_DRAIN_DELAY_MS);
+    bool bDone = (sensor.flowB >= CORRECTION_DOSE) &&
+                 _drainActiveB &&
+                 (millis() - _drainStartMsB >= NUTRIENT_DRAIN_DELAY_MS);
+
+    if (aDone && bDone) {
+        logStateAction("[FSM] Correction drain selesai — lanjut CORRECTION_MIX");
         changeState(FertigationState::CORRECTION_MIX);
     }
 }

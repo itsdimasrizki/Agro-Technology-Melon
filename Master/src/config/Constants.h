@@ -6,6 +6,21 @@
 // Dosis per injeksi koreksi PPM nutrisi A/B.
 constexpr float CORRECTION_DOSE = 0.05f; // 50mL
 
+// ─── Kalibrasi Flow Meter ────────────────────────────────────────────────────
+// Nilai akhir didapat dari pengukuran aktual; 450.0 adalah default pabrik.
+constexpr float FLOW_METER_PULSES_PER_LITER = 450.0f;
+
+// ─── Drain Delay setelah Pump OFF ───────────────────────────────────────────
+// Setelah flow meter mencapai target, Pump dimatikan terlebih dahulu,
+// lalu sistem menunggu NUTRIENT_DRAIN_DELAY_MS sebelum menutup Solenoid.
+constexpr uint32_t NUTRIENT_DRAIN_DELAY_MS = 3000UL;
+
+// ─── Mode Dosing Awal Nutrisi A/B ───────────────────────────────────────────
+// Definisikan makro ini untuk menggunakan continuous flow (Solenoid+Pump ON
+// terus sampai target tercapai). Komentari/undef untuk kembali ke pulsing
+// 1s-open/1s-close (perilaku lama sebelum patch ini).
+#define NUTRIENT_DOSING_CONTINUOUS
+
 // Durasi mixing produksi.
 constexpr uint32_t PRE_MIX_TANK_TIME       = 60000UL;   // 1 menit
 constexpr uint32_t PRE_MIX_CORRECTION_TIME = 300000UL;   // 5 menit

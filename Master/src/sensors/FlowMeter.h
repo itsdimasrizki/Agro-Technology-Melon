@@ -2,6 +2,7 @@
 #define FLOW_METER_H
 
 #include <Arduino.h>
+#include "../config/Constants.h"  // FLOW_METER_PULSES_PER_LITER
 
 class FlowMeter {
 public:
@@ -34,7 +35,7 @@ private:
     unsigned long lastCalcTime;
     uint32_t lastPulseCount;
 
-    static constexpr float PULSES_PER_LITER = 450.0f;
+    static constexpr float PULSES_PER_LITER = FLOW_METER_PULSES_PER_LITER;
 };
 
 #endif

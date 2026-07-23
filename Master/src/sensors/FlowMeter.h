@@ -40,7 +40,7 @@ private:
     unsigned long lastCalcTime;
     uint32_t lastPulseCount;
 
-    static constexpr float PULSES_PER_LITER = 450.0f;
+    static constexpr float PULSES_PER_LITER = 125.0f;
 };
 
 #endif

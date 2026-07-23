@@ -11,6 +11,8 @@
 #include "data/FullSystemIntegrationTestData.h"
 #include "data/MQTTConfigurationTestData.h"
 #include "data/RelayHardwareTestData.h"
+#include "data/FlowCalibrationTestData.h"
+#include "data/FlowCalibrationTestData.h"
 #include "FSMInputData.h"
 
 #include "actuators/RelayManager.h"
@@ -143,6 +145,108 @@ void resetAppNVSOnFirmwareChange() {
 
     logLine("INFO", "NVS", "app_config=reset reason=new_firmware");
 }
+
+#if ENABLE_FLOW_CALIBRATION_TEST_A
+void runFlowCalibrationTestA() {
+    static bool done             = false;
+    static bool pulseOn          = false;
+    static unsigned long lastPulseTime = 0;
+    static unsigned long lastPrint     = 0;
+
+    if (done) {
+        if (millis() - lastPrint < 2000) return;
+        lastPrint = millis();
+        Serial.printf(
+            "t=%010lu | INFO  | FLOW_CAL | channel=A status=DONE volume=%.4fL target=%.4fL -- ukur aktual dan bandingkan\n",
+            millis(), flowA.getVolumeLiter(), FLOW_CAL_TARGET_A
+        );
+        return;
+    }
+
+    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS : FLOW_CAL_PULSE_OFF_MS;
+    if (millis() - lastPulseTime >= pulseDuration) {
+        pulseOn = !pulseOn;
+        lastPulseTime = millis();
+        if (pulseOn) {
+            relay.on(RELAY_PUMP_A);
+            relay.on(RELAY_SOLENOID_A);
+        } else {
+            relay.off(RELAY_PUMP_A);
+            relay.off(RELAY_SOLENOID_A);
+        }
+    }
+
+    if (flowA.getVolumeLiter() >= FLOW_CAL_TARGET_A) {
+        relay.off(RELAY_PUMP_A);
+        relay.off(RELAY_SOLENOID_A);
+        flowA.setCountingEnabled(false);
+        done = true;
+        Serial.printf(
+            "t=%010lu | INFO  | FLOW_CAL | channel=A status=TARGET_REACHED pulses=%lu volume=%.4fL target=%.4fL\n",
+            millis(), flowA.pulseCount, flowA.getVolumeLiter(), FLOW_CAL_TARGET_A
+        );
+        return;
+    }
+
+    if (millis() - lastPrint < 1000) return;
+    lastPrint = millis();
+    Serial.printf(
+        "t=%010lu | INFO  | FLOW_CAL | channel=A pulses=%lu volume=%.4fL target=%.4fL rate=%.3fL/min\n",
+        millis(), flowA.pulseCount, flowA.getVolumeLiter(), FLOW_CAL_TARGET_A, flowA.getFlowRate()
+    );
+}
+#endif
+
+#if ENABLE_FLOW_CALIBRATION_TEST_B
+void runFlowCalibrationTestB() {
+    static bool done             = false;
+    static bool pulseOn          = false;
+    static unsigned long lastPulseTime = 0;
+    static unsigned long lastPrint     = 0;
+
+    if (done) {
+        if (millis() - lastPrint < 2000) return;
+        lastPrint = millis();
+        Serial.printf(
+            "t=%010lu | INFO  | FLOW_CAL | channel=B status=DONE volume=%.4fL target=%.4fL -- ukur aktual dan bandingkan\n",
+            millis(), flowB.getVolumeLiter(), FLOW_CAL_TARGET_B
+        );
+        return;
+    }
+
+    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS : FLOW_CAL_PULSE_OFF_MS;
+    if (millis() - lastPulseTime >= pulseDuration) {
+        pulseOn = !pulseOn;
+        lastPulseTime = millis();
+        if (pulseOn) {
+            relay.on(RELAY_PUMP_B);
+            relay.on(RELAY_SOLENOID_B);
+        } else {
+            relay.off(RELAY_PUMP_B);
+            relay.off(RELAY_SOLENOID_B);
+        }
+    }
+
+    if (flowB.getVolumeLiter() >= FLOW_CAL_TARGET_B) {
+        relay.off(RELAY_PUMP_B);
+        relay.off(RELAY_SOLENOID_B);
+        flowB.setCountingEnabled(false);
+        done = true;
+        Serial.printf(
+            "t=%010lu | INFO  | FLOW_CAL | channel=B status=TARGET_REACHED pulses=%lu volume=%.4fL target=%.4fL\n",
+            millis(), flowB.pulseCount, flowB.getVolumeLiter(), FLOW_CAL_TARGET_B
+        );
+        return;
+    }
+
+    if (millis() - lastPrint < 1000) return;
+    lastPrint = millis();
+    Serial.printf(
+        "t=%010lu | INFO  | FLOW_CAL | channel=B pulses=%lu volume=%.4fL target=%.4fL rate=%.3fL/min\n",
+        millis(), flowB.pulseCount, flowB.getVolumeLiter(), FLOW_CAL_TARGET_B, flowB.getFlowRate()
+    );
+}
+#endif
 
 #if ENABLE_RELAY_HARDWARE_TEST
 void runRelayHardwareTest() {
@@ -447,6 +551,16 @@ void setup() {
     flowIrrig.begin(flowIrrigISR);
     logBootStep("FLOW", "ready");
 
+#if ENABLE_FLOW_CALIBRATION_TEST_A
+    flowA.setCountingEnabled(true);
+    logLine("INFO", "TEST", "mode=flow_calibration_A target=set relay=pulsing others=OFF");
+    return;
+#elif ENABLE_FLOW_CALIBRATION_TEST_B
+    flowB.setCountingEnabled(true);
+    logLine("INFO", "TEST", "mode=flow_calibration_B target=set relay=pulsing others=OFF");
+    return;
+#endif
+
     Wire.begin(
         I2C_SDA_PIN,
         I2C_SCL_PIN
@@ -517,6 +631,14 @@ void setup() {
 }
 
 void loop() {
+#if ENABLE_FLOW_CALIBRATION_TEST_A
+    runFlowCalibrationTestA();
+    return;
+#elif ENABLE_FLOW_CALIBRATION_TEST_B
+    runFlowCalibrationTestB();
+    return;
+#endif
+
 #if ENABLE_RELAY_HARDWARE_TEST
     runRelayHardwareTest();
     return;

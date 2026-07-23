@@ -6,6 +6,14 @@
 // Dosis per injeksi koreksi PPM nutrisi A/B.
 constexpr float CORRECTION_DOSE = 0.05f; // 50mL
 
+// Batas atas pembacaan sensor TDS secara fisik (~900 ppm).
+// Di atas ini sensor clip — sistem beralih ke mode estimasi.
+constexpr float TDS_SENSOR_CLIP_PPM     = 900.0f;
+
+// Kenaikan PPM per 1 mL gabungan A+B per 1 liter air (data field test).
+// Base 490 ppm + 1 mL A + 1 mL B / 1 L → +330 ppm.
+constexpr float PPM_PER_ML_PER_LITER_AB = 330.0f;
+
 // Durasi mixing produksi.
 constexpr uint32_t PRE_MIX_TANK_TIME       = 60000UL;   // 1 menit
 constexpr uint32_t PRE_MIX_CORRECTION_TIME = 300000UL;   // 5 menit
@@ -13,8 +21,18 @@ constexpr uint32_t MIX_A_TIME              = 900000UL;  // 15 menit
 constexpr uint32_t MIX_B_TIME              = 900000UL;  // 15 menit
 
 constexpr unsigned long WATER_FILL_TIMEOUT  = 7200000UL; // 2 jam
-constexpr unsigned long NUTRIENT_TIMEOUT    = 300000UL;  // 5 menit
-constexpr unsigned long CORRECTION_MIX_TIME = 60000UL;  // 1 menit
+constexpr unsigned long NUTRIENT_TIMEOUT    = 900000UL;  // 10 menit
+
+// Durasi pulsing per channel — sesuaikan dengan kekuatan pompa submersible.
+// A lebih lemah, butuh ON lebih lama agar air naik ke sensor.
+constexpr unsigned long NUTRIENT_A_PULSE_ON_MS  = 5000UL;  // 5 detik ON
+constexpr unsigned long NUTRIENT_A_PULSE_OFF_MS = 1000UL;  // 1 detik OFF
+constexpr unsigned long NUTRIENT_B_PULSE_ON_MS  = 5000UL;  // 1 detik ON
+constexpr unsigned long NUTRIENT_B_PULSE_OFF_MS = 1000UL;  // 1 detik OFF
+
+// Waktu solenoid tetap terbuka setelah pompa mati (drain air di selang kembali ke toren).
+constexpr unsigned long NUTRIENT_DRAIN_DELAY_MS = 60000UL; // 1 menit
+constexpr unsigned long CORRECTION_MIX_TIME = 900000UL;  // 15 menit
 constexpr uint32_t      PRE_IRRIGATION_MIX_TIME = 60000UL; // 1 menit
 constexpr uint32_t      CORRECTION_DELAY    = 180000UL; // 3 menit
 

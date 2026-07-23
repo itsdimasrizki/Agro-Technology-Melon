@@ -113,9 +113,11 @@ void MQTTManager::publishSensors(const SensorData& data) {
     doc["timestamp"] = millis();
 
     JsonObject sensors   = doc["sensors"].to<JsonObject>();
-    sensors["ph"]          = round(data.ph * 100.0f) / 100.0f;
-    sensors["ppm"]         = (int)data.ppm;
-    sensors["temperature"] = round(data.temperature * 10.0f) / 10.0f;
+    sensors["ph"]              = round(data.ph * 100.0f) / 100.0f;
+    sensors["ppm"]             = (int)data.ppm;
+    sensors["effective_ppm"]   = (int)fsm.getEffectivePPM();
+    sensors["estimation_mode"] = fsm.isEstimationMode();
+    sensors["temperature"]     = round(data.temperature * 10.0f) / 10.0f;
     sensors["water_level"] = round(data.waterLevel * 10.0f) / 10.0f; // liter, bukan cm/persen
     sensors["tank_volume"] = round(data.tankVolume * 10.0f) / 10.0f;
     sensors["soil_adc"]    = data.soilADC;
@@ -141,7 +143,7 @@ void MQTTManager::publishSensors(const SensorData& data) {
         fill["remaining_liter"] = round(remaining * 10.0f) / 10.0f;
     }
 
-    char buf[384];
+    char buf[512];
     serializeJson(doc, buf);
 
     mqttClient.publish(TOPIC_SENSORS, buf, true);

@@ -291,6 +291,7 @@ const char* stateToString(FertigationState state) {
         case FertigationState::PRE_MIX_CORRECTION:      return "PRE_MIX_CORRECTION";
         case FertigationState::CORRECT_PPM:             return "CORRECT_PPM";
         case FertigationState::CORRECTION_MIX:          return "CORRECTION_MIX";
+        case FertigationState::ESTIMATION_DOSE:         return "ESTIMATION_DOSE";
         case FertigationState::READY:                   return "READY";
         case FertigationState::PRE_IRRIGATION_MIX:      return "PRE_IRRIGATION_MIX";
         case FertigationState::PRE_IRRIGATION_VALIDATE: return "PRE_IRRIGATION_VALIDATE";

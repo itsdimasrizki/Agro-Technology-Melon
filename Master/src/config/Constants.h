@@ -6,6 +6,14 @@
 // Dosis per injeksi koreksi PPM nutrisi A/B.
 constexpr float CORRECTION_DOSE = 0.05f; // 50mL
 
+// Volume selang dari solenoid ke mulut toren (dead volume).
+// Kalibrasi: tutup ujung selang, nyalakan pompa, catat volume saat flow sensor berhenti.
+constexpr float HOSE_DEAD_VOLUME_A = 0.0f; // liter - kalibrasi dulu sebelum pakai
+constexpr float HOSE_DEAD_VOLUME_B = 0.0f; // liter - kalibrasi dulu sebelum pakai
+
+// Waktu tunggu selang drain setelah dosing selesai (solenoid terbuka, pompa mati).
+constexpr uint32_t HOSE_DRAIN_TIME = 5000UL; // 5 detik
+
 // Durasi mixing produksi.
 constexpr uint32_t PRE_MIX_TANK_TIME       = 60000UL;   // 1 menit
 constexpr uint32_t PRE_MIX_CORRECTION_TIME = 300000UL;   // 5 menit

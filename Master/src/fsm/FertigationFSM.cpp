@@ -716,35 +716,31 @@ void FertigationFSM::handleAddNutrientA() {
         if (!wasRecovering) {
             nutrientAFlow.reset();
         }
-        lastPulseTime = millis();
-        pulseOpenState = true;
+        pulseOpenState = false; // false = dosing, true = draining
         nutrientAFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_A);
         relayManager.on(RELAY_SOLENOID_A);
         stateInitialized = true;
-        logStateAction("[FSM] Dosing Nutrient A (Pulsed)");
+        logStateAction("[FSM] Dosing Nutrient A (Continuous)");
     }
 
-    // Solenoid A / Pompa A pulsing (buka 1s, tutup 1s)
-    if (millis() - lastPulseTime >= 1000) {
-        pulseOpenState = !pulseOpenState;
-        lastPulseTime = millis();
-        if (pulseOpenState) {
-            relayManager.on(RELAY_PUMP_A);
-            relayManager.on(RELAY_SOLENOID_A);
-            logStateAction("[FSM] Nutrient A Solenoid OPEN");
-        } else {
+    if (!pulseOpenState) {
+        // Phase dosing: pompa + solenoid nyala terus, hitung flow hingga target + dead volume
+        float effectiveTarget = targetNutrientA + HOSE_DEAD_VOLUME_A;
+        if (sensor.flowA >= effectiveTarget) {
+            nutrientAFlow.setCountingEnabled(false);
             relayManager.off(RELAY_PUMP_A);
-            relayManager.off(RELAY_SOLENOID_A);
-            logStateAction("[FSM] Nutrient A Solenoid CLOSED");
+            // Solenoid tetap terbuka agar air di selang drain balik ke toren
+            pulseOpenState = true;
+            lastPulseTime = millis();
+            logStateAction("[FSM] Nutrient A target reached - draining hose");
         }
-    }
-
-    if (sensor.flowA >= targetNutrientA) {
-        nutrientAFlow.setCountingEnabled(false);
-        relayManager.off(RELAY_PUMP_A);
-        relayManager.off(RELAY_SOLENOID_A);
-        changeState(FertigationState::MIX_A);
+    } else {
+        // Phase drain: tunggu air di selang habis turun
+        if (millis() - lastPulseTime >= HOSE_DRAIN_TIME) {
+            relayManager.off(RELAY_SOLENOID_A);
+            changeState(FertigationState::MIX_A);
+        }
     }
 }
 
@@ -786,35 +782,31 @@ void FertigationFSM::handleAddNutrientB() {
         if (!wasRecovering) {
             nutrientBFlow.reset();
         }
-        lastPulseTime = millis();
-        pulseOpenState = true;
+        pulseOpenState = false; // false = dosing, true = draining
         nutrientBFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_B);
         relayManager.on(RELAY_SOLENOID_B);
         stateInitialized = true;
-        logStateAction("[FSM] Dosing Nutrient B (Pulsed)");
+        logStateAction("[FSM] Dosing Nutrient B (Continuous)");
     }
 
-    // Solenoid B / Pompa B pulsing (buka 1s, tutup 1s)
-    if (millis() - lastPulseTime >= 1000) {
-        pulseOpenState = !pulseOpenState;
-        lastPulseTime = millis();
-        if (pulseOpenState) {
-            relayManager.on(RELAY_PUMP_B);
-            relayManager.on(RELAY_SOLENOID_B);
-            logStateAction("[FSM] Nutrient B Solenoid OPEN");
-        } else {
+    if (!pulseOpenState) {
+        // Phase dosing: pompa + solenoid nyala terus, hitung flow hingga target + dead volume
+        float effectiveTarget = targetNutrientB + HOSE_DEAD_VOLUME_B;
+        if (sensor.flowB >= effectiveTarget) {
+            nutrientBFlow.setCountingEnabled(false);
             relayManager.off(RELAY_PUMP_B);
-            relayManager.off(RELAY_SOLENOID_B);
-            logStateAction("[FSM] Nutrient B Solenoid CLOSED");
+            // Solenoid tetap terbuka agar air di selang drain balik ke toren
+            pulseOpenState = true;
+            lastPulseTime = millis();
+            logStateAction("[FSM] Nutrient B target reached - draining hose");
         }
-    }
-
-    if (sensor.flowB >= targetNutrientB) {
-        nutrientBFlow.setCountingEnabled(false);
-        relayManager.off(RELAY_PUMP_B);
-        relayManager.off(RELAY_SOLENOID_B);
-        changeState(FertigationState::MIX_B);
+    } else {
+        // Phase drain: tunggu air di selang habis turun
+        if (millis() - lastPulseTime >= HOSE_DRAIN_TIME) {
+            relayManager.off(RELAY_SOLENOID_B);
+            changeState(FertigationState::MIX_B);
+        }
     }
 }
 

@@ -37,12 +37,12 @@ constexpr uint32_t     CORRECTION_DELAY        = 180000UL;  // 3 menit
 constexpr unsigned long WATER_FILL_TIMEOUT  = 7200000UL; // 2 jam
 constexpr unsigned long NUTRIENT_TIMEOUT    = 900000UL;  // 15 menit
 
-// Durasi pulsing per channel — sesuaikan dengan kekuatan pompa submersible.
+// Durasi pulsing per channel — hasil kalibrasi stabil 0.5L (FlowCalibrationTestData.h).
 // A lebih lemah, butuh ON lebih lama agar air naik ke sensor.
-constexpr unsigned long NUTRIENT_A_PULSE_ON_MS  = 5000UL;  // 5 detik ON
-constexpr unsigned long NUTRIENT_A_PULSE_OFF_MS = 1000UL;  // 1 detik OFF
-constexpr unsigned long NUTRIENT_B_PULSE_ON_MS  = 5000UL;  // 1 detik ON
-constexpr unsigned long NUTRIENT_B_PULSE_OFF_MS = 1000UL;  // 1 detik OFF
+constexpr unsigned long NUTRIENT_A_PULSE_ON_MS  = 3125UL;  // 3.125 detik ON
+constexpr unsigned long NUTRIENT_A_PULSE_OFF_MS =  100UL;  // 100ms OFF
+constexpr unsigned long NUTRIENT_B_PULSE_ON_MS  =  305UL;  // 305ms ON
+constexpr unsigned long NUTRIENT_B_PULSE_OFF_MS = 1400UL;  // 1.4 detik OFF
 
 // Waktu solenoid tetap terbuka setelah pompa mati (drain air di selang kembali ke toren).
 constexpr unsigned long NUTRIENT_DRAIN_DELAY_MS = 60000UL; // 1 menit

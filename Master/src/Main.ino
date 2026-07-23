@@ -163,7 +163,7 @@ void runFlowCalibrationTestA() {
         return;
     }
 
-    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS : FLOW_CAL_PULSE_OFF_MS;
+    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS_A : FLOW_CAL_PULSE_OFF_MS_A;
     if (millis() - lastPulseTime >= pulseDuration) {
         pulseOn = !pulseOn;
         lastPulseTime = millis();
@@ -214,7 +214,7 @@ void runFlowCalibrationTestB() {
         return;
     }
 
-    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS : FLOW_CAL_PULSE_OFF_MS;
+    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS_B : FLOW_CAL_PULSE_OFF_MS_B;
     if (millis() - lastPulseTime >= pulseDuration) {
         pulseOn = !pulseOn;
         lastPulseTime = millis();

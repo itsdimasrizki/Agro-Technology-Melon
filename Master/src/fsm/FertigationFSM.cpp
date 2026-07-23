@@ -85,7 +85,7 @@ void FertigationFSM::begin() {
         logStateAction("[FSM] Belum ada konfigurasi dari web — menunggu di IDLE");
         changeState(FertigationState::IDLE);
     } else {
-#if SKIP_DAILY_SCHEDULE
+#if SKIP_DAILY_SCHEDULE || ENABLE_FULL_SYSTEM_TEST
         changeState(FertigationState::PREPARE_DAILY_MIX);
 #else
         changeState(FertigationState::WAIT_DAILY_MIX);
@@ -582,7 +582,7 @@ void FertigationFSM::handleIdle() {
 
     if (configManager.isConfigured()) {
         logStateAction("[FSM] Konfigurasi terdeteksi — memulai penjadwalan fertigasi");
-#if SKIP_DAILY_SCHEDULE
+#if SKIP_DAILY_SCHEDULE || ENABLE_FULL_SYSTEM_TEST
         changeState(FertigationState::PREPARE_DAILY_MIX);
 #else
         changeState(FertigationState::WAIT_DAILY_MIX);

@@ -9,7 +9,7 @@
 // Set A=1 → test Pompa A + Solenoid A saja, relay lain mati.
 // Set B=1 → test Pompa B + Solenoid B saja, relay lain mati.
 // Target volume diatur di test/data/FlowCalibrationTestData.h
-#define ENABLE_FLOW_CALIBRATION_TEST_A    0
+#define ENABLE_FLOW_CALIBRATION_TEST_A    1
 #define ENABLE_FLOW_CALIBRATION_TEST_B    0
 
 // Set PCF8563 RTC to firmware build time on boot.

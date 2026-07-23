@@ -31,6 +31,12 @@ private:
     uint8_t _pin;
     volatile bool _countingEnabled;
 
+    // Debounce: abaikan pulse yang datang < DEBOUNCE_US setelah pulse sebelumnya.
+    // Getaran solenoid/relay terjadi dalam mikro-detik; aliran asli min ~26ms
+    // bahkan pada flow rate tertinggi submersible pompa nutrisi ini.
+    volatile unsigned long _lastPulseUs = 0;
+    static constexpr unsigned long DEBOUNCE_US = 5000UL; // 5ms
+
     unsigned long lastCalcTime;
     uint32_t lastPulseCount;
 

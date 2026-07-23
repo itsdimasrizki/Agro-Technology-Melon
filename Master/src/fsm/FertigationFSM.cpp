@@ -85,7 +85,7 @@ void FertigationFSM::begin() {
         logStateAction("[FSM] Belum ada konfigurasi dari web — menunggu di IDLE");
         changeState(FertigationState::IDLE);
     } else {
-#if SKIP_DAILY_SCHEDULE
+#if SKIP_DAILY_SCHEDULE || ENABLE_FULL_SYSTEM_TEST
         changeState(FertigationState::PREPARE_DAILY_MIX);
 #else
         changeState(FertigationState::WAIT_DAILY_MIX);
@@ -167,6 +167,10 @@ void FertigationFSM::update() {
 
         case FertigationState::CORRECTION_MIX:
             handleCorrectionMix();
+            break;
+
+        case FertigationState::ESTIMATION_DOSE:
+            handleEstimationDose();
             break;
 
         case FertigationState::READY:
@@ -265,10 +269,12 @@ void FertigationFSM::closeWaterInlet() {
 }
 
 void FertigationFSM::startFillStirrer() {
+    relayManager.on(RELAY_PUMP_MIX);
     relayManager.on(RELAY_MIXER_STIR);
 }
 
 void FertigationFSM::stopFillStirrer() {
+    relayManager.off(RELAY_PUMP_MIX);
     relayManager.off(RELAY_MIXER_STIR);
 }
 
@@ -457,6 +463,10 @@ void FertigationFSM::gotoError(ErrorCode error) {
 void FertigationFSM::gotoPostCorrection() {
     if (correctionOrigin == FertigationState::PRE_IRRIGATION_VALIDATE) {
         changeState(FertigationState::PRE_IRRIGATION_VALIDATE);
+    } else if (correctionOrigin == FertigationState::ESTIMATION_DOSE) {
+        // Setelah CORRECTION_MIX pasca estimation dose, langsung READY —
+        // tidak balik ke VALIDATE karena TDS tidak bisa baca di atas 900 ppm.
+        gotoReady();
     } else {
         gotoValidate();
     }
@@ -572,7 +582,7 @@ void FertigationFSM::handleIdle() {
 
     if (configManager.isConfigured()) {
         logStateAction("[FSM] Konfigurasi terdeteksi — memulai penjadwalan fertigasi");
-#if SKIP_DAILY_SCHEDULE
+#if SKIP_DAILY_SCHEDULE || ENABLE_FULL_SYSTEM_TEST
         changeState(FertigationState::PREPARE_DAILY_MIX);
 #else
         changeState(FertigationState::WAIT_DAILY_MIX);
@@ -608,6 +618,14 @@ void FertigationFSM::handlePrepareDailyMix() {
     nutrientAFlow.reset();
     nutrientBFlow.reset();
     clearRecovery();
+    // Reset estimation state setiap siklus harian — dosis estimasi tidak boleh
+    // dibawa ke hari berikutnya karena PPM anchor berubah setelah FILL_WATER.
+    _estimationActive = false;
+    _estimAnchorPPM   = 0.0f;
+    _estimTargetA_L   = 0.0f;
+    _estimTargetB_L   = 0.0f;
+    _estimDosedA_L    = 0.0f;
+    _estimDosedB_L    = 0.0f;
     changeState(FertigationState::FILL_WATER);
 }
 
@@ -706,6 +724,8 @@ void FertigationFSM::handlePreMixA() {
 
 void FertigationFSM::handleAddNutrientA() {
     if (isStateTimeout(NUTRIENT_TIMEOUT)) {
+        relayManager.off(RELAY_PUMP_A);
+        relayManager.off(RELAY_SOLENOID_A);
         gotoError(ErrorCode::NUTRIENT_A_TIMEOUT);
         return;
     }
@@ -716,35 +736,48 @@ void FertigationFSM::handleAddNutrientA() {
         if (!wasRecovering) {
             nutrientAFlow.reset();
         }
-        lastPulseTime = millis();
-        pulseOpenState = true;
+        lastPulseTime     = millis();
+        pulseOpenState    = true;
+        _nutrientDraining = false;
         nutrientAFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_A);
         relayManager.on(RELAY_SOLENOID_A);
         stateInitialized = true;
-        logStateAction("[FSM] Dosing Nutrient A (Pulsed)");
+        logStateAction("[FSM] Dosing Nutrient A (5s ON / 1s OFF)");
     }
 
-    // Solenoid A / Pompa A pulsing (buka 1s, tutup 1s)
-    if (millis() - lastPulseTime >= 1000) {
-        pulseOpenState = !pulseOpenState;
-        lastPulseTime = millis();
-        if (pulseOpenState) {
-            relayManager.on(RELAY_PUMP_A);
-            relayManager.on(RELAY_SOLENOID_A);
-            logStateAction("[FSM] Nutrient A Solenoid OPEN");
-        } else {
-            relayManager.off(RELAY_PUMP_A);
+    // Phase drain: pompa sudah mati, solenoid terbuka, tunggu air turun ke toren
+    if (_nutrientDraining) {
+        if (millis() - lastPulseTime >= NUTRIENT_DRAIN_DELAY_MS) {
             relayManager.off(RELAY_SOLENOID_A);
-            logStateAction("[FSM] Nutrient A Solenoid CLOSED");
+            _nutrientDraining = false;
+            changeState(FertigationState::MIX_A);
         }
+        return;
     }
 
+    // Target tercapai: matikan pompa, biarkan solenoid terbuka untuk drain
     if (sensor.flowA >= targetNutrientA) {
         nutrientAFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_A);
-        relayManager.off(RELAY_SOLENOID_A);
-        changeState(FertigationState::MIX_A);
+        _nutrientDraining = true;
+        lastPulseTime     = millis();
+        logStateAction("[FSM] Nutrient A target reached — pompa mati, drain 1 menit");
+        return;
+    }
+
+    // Pulsing 5s ON / 1s OFF — pompa A submersible perlu waktu lebih lama naikkan air
+    unsigned long pulseDuration = pulseOpenState ? NUTRIENT_A_PULSE_ON_MS : NUTRIENT_A_PULSE_OFF_MS;
+    if (millis() - lastPulseTime >= pulseDuration) {
+        pulseOpenState = !pulseOpenState;
+        lastPulseTime  = millis();
+        if (pulseOpenState) {
+            relayManager.on(RELAY_PUMP_A);
+            relayManager.on(RELAY_SOLENOID_A);
+        } else {
+            relayManager.off(RELAY_PUMP_A);
+            relayManager.off(RELAY_SOLENOID_A);
+        }
     }
 }
 
@@ -776,6 +809,8 @@ void FertigationFSM::handlePreMixB() {
 
 void FertigationFSM::handleAddNutrientB() {
     if (isStateTimeout(NUTRIENT_TIMEOUT)) {
+        relayManager.off(RELAY_PUMP_B);
+        relayManager.off(RELAY_SOLENOID_B);
         gotoError(ErrorCode::NUTRIENT_B_TIMEOUT);
         return;
     }
@@ -786,35 +821,48 @@ void FertigationFSM::handleAddNutrientB() {
         if (!wasRecovering) {
             nutrientBFlow.reset();
         }
-        lastPulseTime = millis();
-        pulseOpenState = true;
+        lastPulseTime     = millis();
+        pulseOpenState    = true;
+        _nutrientDraining = false;
         nutrientBFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_B);
         relayManager.on(RELAY_SOLENOID_B);
         stateInitialized = true;
-        logStateAction("[FSM] Dosing Nutrient B (Pulsed)");
+        logStateAction("[FSM] Dosing Nutrient B (1s ON / 1s OFF)");
     }
 
-    // Solenoid B / Pompa B pulsing (buka 1s, tutup 1s)
-    if (millis() - lastPulseTime >= 1000) {
-        pulseOpenState = !pulseOpenState;
-        lastPulseTime = millis();
-        if (pulseOpenState) {
-            relayManager.on(RELAY_PUMP_B);
-            relayManager.on(RELAY_SOLENOID_B);
-            logStateAction("[FSM] Nutrient B Solenoid OPEN");
-        } else {
-            relayManager.off(RELAY_PUMP_B);
+    // Phase drain: pompa sudah mati, solenoid terbuka, tunggu air turun ke toren
+    if (_nutrientDraining) {
+        if (millis() - lastPulseTime >= NUTRIENT_DRAIN_DELAY_MS) {
             relayManager.off(RELAY_SOLENOID_B);
-            logStateAction("[FSM] Nutrient B Solenoid CLOSED");
+            _nutrientDraining = false;
+            changeState(FertigationState::MIX_B);
         }
+        return;
     }
 
+    // Target tercapai: matikan pompa, biarkan solenoid terbuka untuk drain
     if (sensor.flowB >= targetNutrientB) {
         nutrientBFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_B);
-        relayManager.off(RELAY_SOLENOID_B);
-        changeState(FertigationState::MIX_B);
+        _nutrientDraining = true;
+        lastPulseTime     = millis();
+        logStateAction("[FSM] Nutrient B target reached — pompa mati, drain 1 menit");
+        return;
+    }
+
+    // Pulsing 1s ON / 1s OFF
+    unsigned long pulseDuration = pulseOpenState ? NUTRIENT_B_PULSE_ON_MS : NUTRIENT_B_PULSE_OFF_MS;
+    if (millis() - lastPulseTime >= pulseDuration) {
+        pulseOpenState = !pulseOpenState;
+        lastPulseTime  = millis();
+        if (pulseOpenState) {
+            relayManager.on(RELAY_PUMP_B);
+            relayManager.on(RELAY_SOLENOID_B);
+        } else {
+            relayManager.off(RELAY_PUMP_B);
+            relayManager.off(RELAY_SOLENOID_B);
+        }
     }
 }
 
@@ -832,6 +880,23 @@ void FertigationFSM::handleMixB() {
 }
 
 void FertigationFSM::handleValidate() {
+    // Sensor TDS clip di ~900 ppm dan target resep di atas itu:
+    // alih ke estimasi langsung (satu tembak), tidak pakai loop CORRECT_PPM.
+    if (sensor.ppm >= TDS_SENSOR_CLIP_PPM && (float)targetPPM > TDS_SENSOR_CLIP_PPM) {
+        if (sensor.tankVolume > 0.0f) {
+            float mL = ((float)targetPPM - TDS_SENSOR_CLIP_PPM)
+                       * sensor.tankVolume / PPM_PER_ML_PER_LITER_AB;
+            _estimTargetA_L   = mL / 2.0f / 1000.0f;
+            _estimTargetB_L   = mL / 2.0f / 1000.0f;
+            _estimAnchorPPM   = sensor.ppm;
+            _estimationActive = true;
+            _estimDosedA_L    = 0.0f;
+            _estimDosedB_L    = 0.0f;
+            changeState(FertigationState::ESTIMATION_DOSE);
+            return;
+        }
+    }
+
     if (isPPMAcceptableForUse()) {
         relayManager.off(RELAY_PUMP_A);
         relayManager.off(RELAY_SOLENOID_A);
@@ -865,6 +930,25 @@ void FertigationFSM::handlePreMixCorrection() {
 }
 
 void FertigationFSM::handleCorrectPPM() {
+    // Sensor clip sebelum target tercapai: hentikan loop 50 mL,
+    // pindah ke estimation dose sekali tembak.
+    if (sensor.ppm >= TDS_SENSOR_CLIP_PPM && (float)targetPPM > TDS_SENSOR_CLIP_PPM) {
+        relayManager.off(RELAY_PUMP_A); relayManager.off(RELAY_SOLENOID_A);
+        relayManager.off(RELAY_PUMP_B); relayManager.off(RELAY_SOLENOID_B);
+        if (sensor.tankVolume > 0.0f) {
+            float mL = ((float)targetPPM - TDS_SENSOR_CLIP_PPM)
+                       * sensor.tankVolume / PPM_PER_ML_PER_LITER_AB;
+            _estimTargetA_L   = mL / 2.0f / 1000.0f;
+            _estimTargetB_L   = mL / 2.0f / 1000.0f;
+            _estimAnchorPPM   = sensor.ppm;
+            _estimationActive = true;
+            _estimDosedA_L    = 0.0f;
+            _estimDosedB_L    = 0.0f;
+            changeState(FertigationState::ESTIMATION_DOSE);
+            return;
+        }
+    }
+
     if (isPPMAcceptableForUse()) {
         relayManager.off(RELAY_PUMP_A);
         relayManager.off(RELAY_SOLENOID_A);
@@ -963,6 +1047,85 @@ void FertigationFSM::handleCorrectionMix() {
     if (updateMixing(CORRECTION_MIX_TIME)) {
         gotoPostCorrection();
     }
+}
+
+void FertigationFSM::handleEstimationDose() {
+    if (isStateTimeout(NUTRIENT_TIMEOUT)) {
+        gotoError(ErrorCode::NUTRIENT_A_TIMEOUT);
+        return;
+    }
+
+    if (!stateInitialized) {
+        nutrientAFlow.reset();
+        nutrientBFlow.reset();
+        nutrientAFlow.setCountingEnabled(true);
+        nutrientBFlow.setCountingEnabled(true);
+        lastPulseTime  = millis();
+        pulseOpenState = true;
+        relayManager.on(RELAY_PUMP_A);
+        relayManager.on(RELAY_SOLENOID_A);
+        relayManager.on(RELAY_PUMP_B);
+        relayManager.on(RELAY_SOLENOID_B);
+        stateInitialized = true;
+        Serial.printf(
+            "t=%010lu | INFO  | FSM      | state=ESTIMATION_DOSE anchor=%.0fppm target_A=%.4fL target_B=%.4fL\n",
+            millis(), _estimAnchorPPM, _estimTargetA_L, _estimTargetB_L
+        );
+    }
+
+    // Pulsing A+B bersamaan (1s buka, 1s tutup) — sama dengan pola CORRECT_PPM
+    if (millis() - lastPulseTime >= 1000) {
+        pulseOpenState = !pulseOpenState;
+        lastPulseTime  = millis();
+        if (pulseOpenState) {
+            if (sensor.flowA < _estimTargetA_L) {
+                relayManager.on(RELAY_PUMP_A);
+                relayManager.on(RELAY_SOLENOID_A);
+            }
+            if (sensor.flowB < _estimTargetB_L) {
+                relayManager.on(RELAY_PUMP_B);
+                relayManager.on(RELAY_SOLENOID_B);
+            }
+        } else {
+            relayManager.off(RELAY_PUMP_A); relayManager.off(RELAY_SOLENOID_A);
+            relayManager.off(RELAY_PUMP_B); relayManager.off(RELAY_SOLENOID_B);
+        }
+    }
+
+    // Matikan masing-masing segera saat target tercapai
+    if (sensor.flowA >= _estimTargetA_L) {
+        nutrientAFlow.setCountingEnabled(false);
+        relayManager.off(RELAY_PUMP_A);
+        relayManager.off(RELAY_SOLENOID_A);
+    }
+    if (sensor.flowB >= _estimTargetB_L) {
+        nutrientBFlow.setCountingEnabled(false);
+        relayManager.off(RELAY_PUMP_B);
+        relayManager.off(RELAY_SOLENOID_B);
+    }
+
+    // Keduanya selesai: simpan realisasi dari flow meter, lalu mix → READY
+    if (sensor.flowA >= _estimTargetA_L && sensor.flowB >= _estimTargetB_L) {
+        _estimDosedA_L = sensor.flowA;
+        _estimDosedB_L = sensor.flowB;
+        relayManager.off(RELAY_PUMP_A); relayManager.off(RELAY_SOLENOID_A);
+        relayManager.off(RELAY_PUMP_B); relayManager.off(RELAY_SOLENOID_B);
+        Serial.printf(
+            "t=%010lu | INFO  | FSM      | state=ESTIMATION_DOSE done dosed_A=%.4fL dosed_B=%.4fL eff_ppm=%.0f\n",
+            millis(), _estimDosedA_L, _estimDosedB_L, getEffectivePPM()
+        );
+        // correctionOrigin = ESTIMATION_DOSE memberi tahu gotoPostCorrection()
+        // untuk ke READY, bukan balik ke VALIDATE (TDS tidak bisa validasi > 900 ppm).
+        correctionOrigin = FertigationState::ESTIMATION_DOSE;
+        changeState(FertigationState::CORRECTION_MIX);
+    }
+}
+
+float FertigationFSM::getEffectivePPM() const {
+    if (!_estimationActive) return sensor.ppm;
+    if (sensor.tankVolume <= 0.0f) return sensor.ppm;
+    float dosedML = (_estimDosedA_L + _estimDosedB_L) * 1000.0f;
+    return _estimAnchorPPM + (dosedML * PPM_PER_ML_PER_LITER_AB) / sensor.tankVolume;
 }
 
 void FertigationFSM::handleReady() {

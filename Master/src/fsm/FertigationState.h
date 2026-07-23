@@ -30,6 +30,8 @@ enum class FertigationState {
 
     CORRECTION_MIX,
 
+    ESTIMATION_DOSE,
+
     READY,
 
     PRE_IRRIGATION_MIX,

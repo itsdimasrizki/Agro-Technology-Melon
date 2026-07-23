@@ -47,6 +47,11 @@ public:
     void  clearNeedRefillAlert()           { _needRefillAlertPending = false; }
     float getFillStartVolume()       const { return _fillStartVolume; }
 
+    // PPM efektif untuk ditampilkan ke operator/web.
+    // < 900 ppm: nilai TDS mentah. >= 900 ppm (estimasi): hasil hitungan field test.
+    float getEffectivePPM()   const;
+    bool  isEstimationMode()  const { return _estimationActive; }
+
 private:
     void changeState(
         FertigationState newState
@@ -156,6 +161,7 @@ private:
     void handlePreIrrigationValidate();
     void handleIrrigation();
     void handleError();
+    void handleEstimationDose();
 
     // Timer Fallback Irrigation — dipanggil dari handleReady() saat mode TIMER
     void handleTimerIrrigation();
@@ -217,9 +223,10 @@ private:
 
     bool recovering = false;
 
-    // Timer dan status untuk pulsing solenoid Nutrisi A & B (buka-tutup 1 detik)
+    // Timer dan status untuk pulsing solenoid Nutrisi A & B
     unsigned long lastPulseTime = 0;
-    bool pulseOpenState = false;
+    bool pulseOpenState  = false;
+    bool _nutrientDraining = false; // true = pompa mati, solenoid masih terbuka (drain)
 
     // Menyimpan state mana yang memulai koreksi PPM
     // (VALIDATE atau PRE_IRRIGATION_VALIDATE)
@@ -253,6 +260,15 @@ private:
     // Tracking slot jadwal yang sedang aktif
     int8_t _activeSlotIdx = -1;       // -1 = tidak ada slot aktif
     bool   _timerSlotRunning = false; // apakah sedang dalam window irigasi timer
+
+    // --- Estimation mode (TDS sensor clip > 900 ppm) ---
+    // Reset setiap PREPARE_DAILY_MIX (siklus harian baru).
+    bool  _estimationActive  = false;
+    float _estimAnchorPPM    = 0.0f;  // TDS terakhir saat estimasi diaktifkan (~900)
+    float _estimTargetA_L    = 0.0f;  // target liter pompa A untuk estimation dose
+    float _estimTargetB_L    = 0.0f;  // target liter pompa B untuk estimation dose
+    float _estimDosedA_L     = 0.0f;  // realisasi liter A dari flow meter (untuk getEffectivePPM)
+    float _estimDosedB_L     = 0.0f;  // realisasi liter B dari flow meter
 };
 
 #endif

@@ -86,8 +86,10 @@ bool FlowMeter::isCountingEnabled() const {
     return _countingEnabled;
 }
 
-void FlowMeter::recordPulseFromISR() {
-    if (_countingEnabled) {
-        pulseCount++;
-    }
+void IRAM_ATTR FlowMeter::recordPulseFromISR() {
+    if (!_countingEnabled) return;
+    unsigned long now = micros();
+    if (now - _lastPulseUs < DEBOUNCE_US) return;
+    _lastPulseUs = now;
+    pulseCount++;
 }

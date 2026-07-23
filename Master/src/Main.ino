@@ -163,7 +163,7 @@ void runFlowCalibrationTestA() {
         return;
     }
 
-    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS : FLOW_CAL_PULSE_OFF_MS;
+    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS_A : FLOW_CAL_PULSE_OFF_MS_A;
     if (millis() - lastPulseTime >= pulseDuration) {
         pulseOn = !pulseOn;
         lastPulseTime = millis();
@@ -214,7 +214,7 @@ void runFlowCalibrationTestB() {
         return;
     }
 
-    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS : FLOW_CAL_PULSE_OFF_MS;
+    unsigned long pulseDuration = pulseOn ? FLOW_CAL_PULSE_ON_MS_B : FLOW_CAL_PULSE_OFF_MS_B;
     if (millis() - lastPulseTime >= pulseDuration) {
         pulseOn = !pulseOn;
         lastPulseTime = millis();
@@ -291,6 +291,7 @@ const char* stateToString(FertigationState state) {
         case FertigationState::PRE_MIX_CORRECTION:      return "PRE_MIX_CORRECTION";
         case FertigationState::CORRECT_PPM:             return "CORRECT_PPM";
         case FertigationState::CORRECTION_MIX:          return "CORRECTION_MIX";
+        case FertigationState::ESTIMATION_DOSE:         return "ESTIMATION_DOSE";
         case FertigationState::READY:                   return "READY";
         case FertigationState::PRE_IRRIGATION_MIX:      return "PRE_IRRIGATION_MIX";
         case FertigationState::PRE_IRRIGATION_VALIDATE: return "PRE_IRRIGATION_VALIDATE";

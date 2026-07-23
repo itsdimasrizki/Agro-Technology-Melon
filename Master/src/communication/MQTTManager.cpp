@@ -118,7 +118,10 @@ void MQTTManager::publishSensors(const SensorData& data) {
     sensors["effective_ppm"]   = (int)fsm.getEffectivePPM();
     sensors["estimation_mode"] = fsm.isEstimationMode();
     sensors["temperature"]     = round(data.temperature * 10.0f) / 10.0f;
-    sensors["water_level"] = round(data.waterLevel * 10.0f) / 10.0f; // liter, bukan cm/persen
+    float tankCap = configManager.getTankCapacityLiter();
+    float fillPct = (tankCap > 0.0f) ? (data.tankVolume / tankCap * 100.0f) : 0.0f;
+    if (fillPct > 100.0f) fillPct = 100.0f;
+    sensors["water_level"] = round(fillPct * 10.0f) / 10.0f;  // persen isi tangki (0-100)
     sensors["tank_volume"] = round(data.tankVolume * 10.0f) / 10.0f;
     sensors["soil_adc"]    = data.soilADC;
 
@@ -196,7 +199,7 @@ void MQTTManager::publishRelayStatus() {
     if (relayManager.isOn(RELAY_PUMP_B)) active.add(7);
     if (relayManager.isOn(RELAY_PUMP_MIX)) active.add(8);
 
-    char buf[192];
+    char buf[256];
     serializeJson(doc, buf);
 
     mqttClient.publish(TOPIC_RELAY_STATUS, buf, true);
@@ -700,7 +703,18 @@ void MQTTManager::handleConfigMixScheduleExt(const JsonDocument& doc) {
 // handleSoilResetMode()
 // =========================================
 void MQTTManager::handleSoilResetMode(const String& payload) {
-    soilHealth.resetToHumidityMode();
+    JsonDocument modeDoc;
+    if (deserializeJson(modeDoc, payload) == DeserializationError::Ok
+        && modeDoc["mode"].is<const char*>()) {
+        const char* mode = modeDoc["mode"].as<const char*>();
+        if (strcmp(mode, "TIMER") == 0) {
+            soilHealth.switchToTimerMode();
+        } else {
+            soilHealth.resetToHumidityMode();
+        }
+    } else {
+        soilHealth.resetToHumidityMode();
+    }
     publishSoilHealth();
 }
 

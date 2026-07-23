@@ -648,6 +648,7 @@ void FertigationFSM::handleFillWater() {
         _fillStartVolume    = sensor.tankVolume;
         lastLevelChangeTime = millis();
         _lastRefillAlertMs  = 0;  // paksa kirim alert segera
+        _fillTargetReached  = false;
         startFillStirrer();
         if (sensor.tankVolume < configManager.getTargetFillVolume()) {
             openWaterInlet();
@@ -676,6 +677,7 @@ void FertigationFSM::handleFillWater() {
     // solenoid ditutup dan sistem menunggu level stabil sebentar sebelum lanjut nutrisi.
     if (sensor.tankVolume >= configManager.getTargetFillVolume() ||
         sensor.tankVolume > configManager.getTankCapacityLiter()) {
+        _fillTargetReached = true;
         closeWaterInlet();
         if (millis() - lastLevelChangeTime >= WATER_LEVEL_STABLE_TIMEOUT) {
             stopFillStirrer();
@@ -698,7 +700,7 @@ void FertigationFSM::handleFillWater() {
             // PPM belum cukup, lanjut dosing awal A/B.
             changeState(FertigationState::PRE_MIX_A);
         }
-    } else {
+    } else if (!_fillTargetReached) {
         openWaterInlet();
         // Kirim progress fill ke MQTT secara periodik selama pengisian
         if (millis() - _lastRefillAlertMs >= NEED_REFILL_ALERT_INTERVAL_MS) {

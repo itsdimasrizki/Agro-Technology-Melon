@@ -247,6 +247,7 @@ private:
 
     // --- Safety guard state (checkMinimumWater Opsi A) ---
     bool          _tankLowBlocked     = false;   // flag irigasi diblokir karena tank < safety floor
+    bool          _fillTargetReached  = false;   // latch: target fill sudah tercapai di siklus ini
 
     // --- Need-refill alert state (FILL_WATER waiting for target) ---
     float         _refillDeficit         = 0.0f;    // kekurangan liter (untuk payload MQTT alert)

@@ -144,6 +144,30 @@ void resetAppNVSOnFirmwareChange() {
     logLine("INFO", "NVS", "app_config=reset reason=new_firmware");
 }
 
+#if ENABLE_FLOW_CALIBRATION_TEST_A
+void runFlowCalibrationTestA() {
+    static unsigned long lastPrint = 0;
+    if (millis() - lastPrint < 1000) return;
+    lastPrint = millis();
+    Serial.printf(
+        "t=%010lu | INFO  | FLOW_CAL | channel=A pulses=%lu volume=%.4fL rate=%.3fL/min\n",
+        millis(), flowA.pulseCount, flowA.getVolumeLiter(), flowA.getFlowRate()
+    );
+}
+#endif
+
+#if ENABLE_FLOW_CALIBRATION_TEST_B
+void runFlowCalibrationTestB() {
+    static unsigned long lastPrint = 0;
+    if (millis() - lastPrint < 1000) return;
+    lastPrint = millis();
+    Serial.printf(
+        "t=%010lu | INFO  | FLOW_CAL | channel=B pulses=%lu volume=%.4fL rate=%.3fL/min\n",
+        millis(), flowB.pulseCount, flowB.getVolumeLiter(), flowB.getFlowRate()
+    );
+}
+#endif
+
 #if ENABLE_RELAY_HARDWARE_TEST
 void runRelayHardwareTest() {
     static uint8_t relayIndex = 0;
@@ -447,6 +471,20 @@ void setup() {
     flowIrrig.begin(flowIrrigISR);
     logBootStep("FLOW", "ready");
 
+#if ENABLE_FLOW_CALIBRATION_TEST_A
+    flowA.setCountingEnabled(true);
+    relay.on(RELAY_PUMP_A);
+    relay.on(RELAY_SOLENOID_A);
+    logLine("INFO", "TEST", "mode=flow_calibration_A pump=ON solenoid=ON others=OFF");
+    return;
+#elif ENABLE_FLOW_CALIBRATION_TEST_B
+    flowB.setCountingEnabled(true);
+    relay.on(RELAY_PUMP_B);
+    relay.on(RELAY_SOLENOID_B);
+    logLine("INFO", "TEST", "mode=flow_calibration_B pump=ON solenoid=ON others=OFF");
+    return;
+#endif
+
     Wire.begin(
         I2C_SDA_PIN,
         I2C_SCL_PIN
@@ -517,6 +555,14 @@ void setup() {
 }
 
 void loop() {
+#if ENABLE_FLOW_CALIBRATION_TEST_A
+    runFlowCalibrationTestA();
+    return;
+#elif ENABLE_FLOW_CALIBRATION_TEST_B
+    runFlowCalibrationTestB();
+    return;
+#endif
+
 #if ENABLE_RELAY_HARDWARE_TEST
     runRelayHardwareTest();
     return;

@@ -221,6 +221,13 @@ private:
     unsigned long lastPulseTime = 0;
     bool pulseOpenState = false;
 
+    // Ratchet solenoid: pompa mati dulu, solenoid tutup 75ms kemudian
+    // agar cairan di selang tertahan di ketinggian dan tidak balik ke bawah
+    unsigned long _solenoidACloseTime      = 0;
+    bool          _waitingToCloseSolenoidA = false;
+    unsigned long _solenoidBCloseTime      = 0;
+    bool          _waitingToCloseSolenoidB = false;
+
     // Menyimpan state mana yang memulai koreksi PPM
     // (VALIDATE atau PRE_IRRIGATION_VALIDATE)
     // Digunakan oleh gotoPostCorrection() untuk kembali ke validate yang benar

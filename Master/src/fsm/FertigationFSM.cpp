@@ -199,6 +199,8 @@ void FertigationFSM::update() {
 //! ChangeState
 void FertigationFSM::changeState(FertigationState newState) {
     stopNutrientFlowCounting();
+    _waitingToCloseSolenoidA = false;
+    _waitingToCloseSolenoidB = false;
     state = newState;
     stateStartTime = millis();
     stateInitialized = false;
@@ -718,11 +720,19 @@ void FertigationFSM::handleAddNutrientA() {
         }
         lastPulseTime = millis();
         pulseOpenState = true;
+        _waitingToCloseSolenoidA = false;
         nutrientAFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_A);
         relayManager.on(RELAY_SOLENOID_A);
         stateInitialized = true;
         logStateAction("[FSM] Dosing Nutrient A (Pulsed)");
+    }
+
+    // Ratchet: tutup solenoid A 75ms setelah pompa mati agar cairan tertahan di ketinggian
+    if (_waitingToCloseSolenoidA && millis() >= _solenoidACloseTime) {
+        relayManager.off(RELAY_SOLENOID_A);
+        _waitingToCloseSolenoidA = false;
+        logStateAction("[FSM] Nutrient A Solenoid CLOSED");
     }
 
     // Solenoid A / Pompa A pulsing (buka 1s, tutup 1s)
@@ -732,11 +742,13 @@ void FertigationFSM::handleAddNutrientA() {
         if (pulseOpenState) {
             relayManager.on(RELAY_PUMP_A);
             relayManager.on(RELAY_SOLENOID_A);
-            logStateAction("[FSM] Nutrient A Solenoid OPEN");
+            _waitingToCloseSolenoidA = false;
+            logStateAction("[FSM] Nutrient A Pump OPEN");
         } else {
             relayManager.off(RELAY_PUMP_A);
-            relayManager.off(RELAY_SOLENOID_A);
-            logStateAction("[FSM] Nutrient A Solenoid CLOSED");
+            _waitingToCloseSolenoidA = true;
+            _solenoidACloseTime = millis() + 75;
+            logStateAction("[FSM] Nutrient A Pump OFF (solenoid trapping)");
         }
     }
 
@@ -744,6 +756,7 @@ void FertigationFSM::handleAddNutrientA() {
         nutrientAFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_A);
         relayManager.off(RELAY_SOLENOID_A);
+        _waitingToCloseSolenoidA = false;
         changeState(FertigationState::MIX_A);
     }
 }
@@ -788,11 +801,19 @@ void FertigationFSM::handleAddNutrientB() {
         }
         lastPulseTime = millis();
         pulseOpenState = true;
+        _waitingToCloseSolenoidB = false;
         nutrientBFlow.setCountingEnabled(true);
         relayManager.on(RELAY_PUMP_B);
         relayManager.on(RELAY_SOLENOID_B);
         stateInitialized = true;
         logStateAction("[FSM] Dosing Nutrient B (Pulsed)");
+    }
+
+    // Ratchet: tutup solenoid B 75ms setelah pompa mati agar cairan tertahan di ketinggian
+    if (_waitingToCloseSolenoidB && millis() >= _solenoidBCloseTime) {
+        relayManager.off(RELAY_SOLENOID_B);
+        _waitingToCloseSolenoidB = false;
+        logStateAction("[FSM] Nutrient B Solenoid CLOSED");
     }
 
     // Solenoid B / Pompa B pulsing (buka 1s, tutup 1s)
@@ -802,11 +823,13 @@ void FertigationFSM::handleAddNutrientB() {
         if (pulseOpenState) {
             relayManager.on(RELAY_PUMP_B);
             relayManager.on(RELAY_SOLENOID_B);
-            logStateAction("[FSM] Nutrient B Solenoid OPEN");
+            _waitingToCloseSolenoidB = false;
+            logStateAction("[FSM] Nutrient B Pump OPEN");
         } else {
             relayManager.off(RELAY_PUMP_B);
-            relayManager.off(RELAY_SOLENOID_B);
-            logStateAction("[FSM] Nutrient B Solenoid CLOSED");
+            _waitingToCloseSolenoidB = true;
+            _solenoidBCloseTime = millis() + 75;
+            logStateAction("[FSM] Nutrient B Pump OFF (solenoid trapping)");
         }
     }
 
@@ -814,6 +837,7 @@ void FertigationFSM::handleAddNutrientB() {
         nutrientBFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_B);
         relayManager.off(RELAY_SOLENOID_B);
+        _waitingToCloseSolenoidB = false;
         changeState(FertigationState::MIX_B);
     }
 }
@@ -890,6 +914,8 @@ void FertigationFSM::handleCorrectPPM() {
 
         lastPulseTime = millis();
         pulseOpenState = true;
+        _waitingToCloseSolenoidA = false;
+        _waitingToCloseSolenoidB = false;
 
         if (sensor.flowA < CORRECTION_DOSE) {
             nutrientAFlow.setCountingEnabled(true);
@@ -906,6 +932,16 @@ void FertigationFSM::handleCorrectPPM() {
         logStateAction("[FSM] Injeksi Dosis Koreksi PPM (Pulsed)");
     }
 
+    // Ratchet: tutup solenoid 75ms setelah pompa mati agar cairan tertahan di ketinggian
+    if (_waitingToCloseSolenoidA && millis() >= _solenoidACloseTime) {
+        relayManager.off(RELAY_SOLENOID_A);
+        _waitingToCloseSolenoidA = false;
+    }
+    if (_waitingToCloseSolenoidB && millis() >= _solenoidBCloseTime) {
+        relayManager.off(RELAY_SOLENOID_B);
+        _waitingToCloseSolenoidB = false;
+    }
+
     // Pulsing solenoid Nutrisi A & B bersamaan (buka 1s, tutup 1s)
     if (millis() - lastPulseTime >= 1000) {
         pulseOpenState = !pulseOpenState;
@@ -915,19 +951,23 @@ void FertigationFSM::handleCorrectPPM() {
             if (sensor.flowA < CORRECTION_DOSE) {
                 relayManager.on(RELAY_PUMP_A);
                 relayManager.on(RELAY_SOLENOID_A);
+                _waitingToCloseSolenoidA = false;
                 logStateAction("[FSM] Nutrient A Solenoid OPEN (Correction)");
             }
             if (sensor.flowB < CORRECTION_DOSE) {
                 relayManager.on(RELAY_PUMP_B);
                 relayManager.on(RELAY_SOLENOID_B);
+                _waitingToCloseSolenoidB = false;
                 logStateAction("[FSM] Nutrient B Solenoid OPEN (Correction)");
             }
         } else {
             relayManager.off(RELAY_PUMP_A);
-            relayManager.off(RELAY_SOLENOID_A);
             relayManager.off(RELAY_PUMP_B);
-            relayManager.off(RELAY_SOLENOID_B);
-            logStateAction("[FSM] Nutrient A & B Solenoids CLOSED (Correction)");
+            _waitingToCloseSolenoidA = true;
+            _solenoidACloseTime = millis() + 75;
+            _waitingToCloseSolenoidB = true;
+            _solenoidBCloseTime = millis() + 75;
+            logStateAction("[FSM] Nutrient Pumps OFF (solenoids trapping)");
         }
     }
 
@@ -936,11 +976,13 @@ void FertigationFSM::handleCorrectPPM() {
         nutrientAFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_A);
         relayManager.off(RELAY_SOLENOID_A);
+        _waitingToCloseSolenoidA = false;
     }
     if (sensor.flowB >= CORRECTION_DOSE) {
         nutrientBFlow.setCountingEnabled(false);
         relayManager.off(RELAY_PUMP_B);
         relayManager.off(RELAY_SOLENOID_B);
+        _waitingToCloseSolenoidB = false;
     }
 
     if (sensor.flowA >= CORRECTION_DOSE && sensor.flowB >= CORRECTION_DOSE) {

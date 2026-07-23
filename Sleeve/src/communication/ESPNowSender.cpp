@@ -1,9 +1,8 @@
 #include "ESPNowSender.h"
+#include "../config/PinConfig.h"
 #include <esp_wifi.h>
 
 bool ESPNowSender::_lastSendOk = false;
-
-static constexpr uint8_t ESPNOW_CHANNEL = 1;
 
 bool ESPNowSender::begin() {
     WiFi.mode(WIFI_STA);

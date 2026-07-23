@@ -1,8 +1,8 @@
 #include "SensorManager.h"
 
 static uint16_t calculateSoilAverage(const SoilData& soil) {
-    // Sensor 2 currently reads 0 on hardware, so exclude it from control average.
-    uint32_t sum = (uint32_t)soil.sensor1 + soil.sensor3 + soil.sensor4;
+    // Sensor 1 mati di hardware — exclude dari average.
+    uint32_t sum = (uint32_t)soil.sensor2 + soil.sensor3 + soil.sensor4;
     return (uint16_t)(sum / 3);
 }
 

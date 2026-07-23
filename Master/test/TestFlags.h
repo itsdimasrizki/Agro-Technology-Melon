@@ -5,6 +5,11 @@
 #define ENABLE_FULL_SYSTEM_TEST           0
 #define ENABLE_MQTT_CONFIGURATION_TEST    0
 
+// Test ratchet solenoid + flow sensor pompa nutrisi A/B.
+// Konfigurasi di test/data/NutrientPumpTestData.h
+// (NUTRIENT_PUMP_TEST_TARGET dan NUTRIENT_PUMP_TEST_VOLUME_L)
+#define ENABLE_NUTRIENT_PUMP_TEST         0
+
 // Set PCF8563 RTC to firmware build time on boot.
 // Keep this 1 while calibrating/testing RTC from a WIB build machine.
 // Set to 0 after RTC time is correct and the backup battery is installed.
@@ -14,7 +19,8 @@
     (ENABLE_FSM_SIMULATION_TEST + \
      ENABLE_RELAY_HARDWARE_TEST + \
      ENABLE_FULL_SYSTEM_TEST + \
-     ENABLE_MQTT_CONFIGURATION_TEST)
+     ENABLE_MQTT_CONFIGURATION_TEST + \
+     ENABLE_NUTRIENT_PUMP_TEST)
 
 #if TEST_MODE_COUNT > 1
 #error "Only one test mode may be enabled at a time."

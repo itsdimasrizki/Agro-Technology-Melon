@@ -11,6 +11,7 @@
 #include "data/FullSystemIntegrationTestData.h"
 #include "data/MQTTConfigurationTestData.h"
 #include "data/RelayHardwareTestData.h"
+#include "data/NutrientPumpTestData.h"
 #include "FSMInputData.h"
 
 #include "actuators/RelayManager.h"
@@ -168,6 +169,130 @@ void runRelayHardwareTest() {
     }
 
     lastChange = now;
+}
+#endif
+
+#if ENABLE_NUTRIENT_PUMP_TEST
+void runNutrientPumpTest() {
+    static bool testDone      = false;
+    static bool initialized   = false;
+    static bool pumpADone     = false;
+    static bool pumpBDone     = false;
+    static bool pulseOpen     = true;
+    static unsigned long lastPulseTime = 0;
+    static bool  waitingCloseA     = false;
+    static unsigned long solenoidACloseTime = 0;
+    static bool  waitingCloseB     = false;
+    static unsigned long solenoidBCloseTime = 0;
+    static unsigned long lastLogTime = 0;
+
+    if (testDone) return;
+
+    const bool testA = (NUTRIENT_PUMP_TEST_TARGET == 1 || NUTRIENT_PUMP_TEST_TARGET == 3);
+    const bool testB = (NUTRIENT_PUMP_TEST_TARGET == 2 || NUTRIENT_PUMP_TEST_TARGET == 3);
+
+    if (!initialized) {
+        flowA.reset();
+        flowB.reset();
+        flowA.setCountingEnabled(testA);
+        flowB.setCountingEnabled(testB);
+        lastPulseTime = millis();
+        pulseOpen     = true;
+        if (testA) { relay.on(RELAY_PUMP_A); relay.on(RELAY_SOLENOID_A); }
+        if (testB) { relay.on(RELAY_PUMP_B); relay.on(RELAY_SOLENOID_B); }
+        initialized = true;
+        logLine("INFO", "PUMP_TEST", "status=START");
+    }
+
+    float volA = flowA.getVolumeLiter();
+    float volB = flowB.getVolumeLiter();
+
+    // Log setiap detik
+    if (millis() - lastLogTime >= 1000) {
+        lastLogTime = millis();
+        char msg[96];
+        snprintf(msg, sizeof(msg),
+            "A=%.3f/%.3fL B=%.3f/%.3fL relays=[%s%s%s%s]",
+            volA, testA ? (float)NUTRIENT_PUMP_TEST_VOLUME_L : 0.0f,
+            volB, testB ? (float)NUTRIENT_PUMP_TEST_VOLUME_L : 0.0f,
+            relay.isOn(RELAY_PUMP_A)     ? "PA " : "",
+            relay.isOn(RELAY_SOLENOID_A) ? "SA " : "",
+            relay.isOn(RELAY_PUMP_B)     ? "PB " : "",
+            relay.isOn(RELAY_SOLENOID_B) ? "SB"  : ""
+        );
+        logLine("INFO", "PUMP_TEST", msg);
+    }
+
+    // Ratchet: solenoid tutup 75ms setelah pompa mati
+    if (waitingCloseA && millis() >= solenoidACloseTime) {
+        relay.off(RELAY_SOLENOID_A);
+        waitingCloseA = false;
+    }
+    if (waitingCloseB && millis() >= solenoidBCloseTime) {
+        relay.off(RELAY_SOLENOID_B);
+        waitingCloseB = false;
+    }
+
+    // Stop segera saat target tercapai
+    if (testA && !pumpADone && volA >= NUTRIENT_PUMP_TEST_VOLUME_L) {
+        relay.off(RELAY_PUMP_A);
+        relay.off(RELAY_SOLENOID_A);
+        waitingCloseA = false;
+        flowA.setCountingEnabled(false);
+        pumpADone = true;
+        char msg[64];
+        snprintf(msg, sizeof(msg), "pump=A status=DONE actual=%.3fL target=%.3fL",
+            volA, (float)NUTRIENT_PUMP_TEST_VOLUME_L);
+        logLine("INFO", "PUMP_TEST", msg);
+    }
+    if (testB && !pumpBDone && volB >= NUTRIENT_PUMP_TEST_VOLUME_L) {
+        relay.off(RELAY_PUMP_B);
+        relay.off(RELAY_SOLENOID_B);
+        waitingCloseB = false;
+        flowB.setCountingEnabled(false);
+        pumpBDone = true;
+        char msg[64];
+        snprintf(msg, sizeof(msg), "pump=B status=DONE actual=%.3fL target=%.3fL",
+            volB, (float)NUTRIENT_PUMP_TEST_VOLUME_L);
+        logLine("INFO", "PUMP_TEST", msg);
+    }
+
+    // Semua selesai
+    if ((!testA || pumpADone) && (!testB || pumpBDone)) {
+        relay.allOff();
+        testDone = true;
+        logLine("INFO", "PUMP_TEST", "status=COMPLETE");
+        return;
+    }
+
+    // Pulse cycle: 1s ON, pump OFF → 75ms → solenoid OFF
+    if (millis() - lastPulseTime >= 1000) {
+        pulseOpen     = !pulseOpen;
+        lastPulseTime = millis();
+        if (pulseOpen) {
+            if (testA && !pumpADone) {
+                relay.on(RELAY_PUMP_A);
+                relay.on(RELAY_SOLENOID_A);
+                waitingCloseA = false;
+            }
+            if (testB && !pumpBDone) {
+                relay.on(RELAY_PUMP_B);
+                relay.on(RELAY_SOLENOID_B);
+                waitingCloseB = false;
+            }
+        } else {
+            if (testA && !pumpADone) {
+                relay.off(RELAY_PUMP_A);
+                waitingCloseA     = true;
+                solenoidACloseTime = millis() + 75;
+            }
+            if (testB && !pumpBDone) {
+                relay.off(RELAY_PUMP_B);
+                waitingCloseB     = true;
+                solenoidBCloseTime = millis() + 75;
+            }
+        }
+    }
 }
 #endif
 
@@ -447,6 +572,11 @@ void setup() {
     flowIrrig.begin(flowIrrigISR);
     logBootStep("FLOW", "ready");
 
+#if ENABLE_NUTRIENT_PUMP_TEST
+    logLine("INFO", "TEST", "mode=nutrient_pump_ratchet");
+    return;
+#endif
+
     Wire.begin(
         I2C_SDA_PIN,
         I2C_SCL_PIN
@@ -505,11 +635,18 @@ void setup() {
 #if !ENABLE_FSM_SIMULATION_TEST
     bool espNowOk = espNow.begin();
     logBootStep("ESPNOW", espNowOk ? "ready" : "error");
-    Serial.printf(
-        "t=%010lu | INFO  | ESPNOW   | master_mac=%s\n",
-        millis(),
-        WiFi.macAddress().c_str()
-    );
+    {
+        uint8_t ch = 0;
+        wifi_second_chan_t ch2 = WIFI_SECOND_CHAN_NONE;
+        esp_wifi_get_channel(&ch, &ch2);
+        Serial.printf(
+            "t=%010lu | INFO  | ESPNOW   | master_mac=%s wifi_ch=%u → set ESPNOW_CHANNEL=%u di Sleeve/PinConfig.h\n",
+            millis(),
+            WiFi.macAddress().c_str(),
+            ch,
+            ch
+        );
+    }
 #endif
 
     logLine("INFO", "BOOT", "system=ready");
@@ -519,6 +656,11 @@ void setup() {
 void loop() {
 #if ENABLE_RELAY_HARDWARE_TEST
     runRelayHardwareTest();
+    return;
+#endif
+
+#if ENABLE_NUTRIENT_PUMP_TEST
+    runNutrientPumpTest();
     return;
 #endif
 
